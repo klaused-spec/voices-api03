@@ -58,23 +58,25 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .config-row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
 .config-row .field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px}
 .config-row .field label{font-size:11px;color:var(--text2);font-weight:500}
-.chunks-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.chunks-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;position:sticky;top:0;z-index:10;background:var(--bg);padding:8px 0}
 .chunks-toolbar .count{font-size:13px;color:var(--text2);margin-right:auto}
 .btn-sm{padding:6px 14px;font-size:12px;background:var(--surface2);color:var(--text);border:1px solid var(--border)}
 .btn-sm:hover{background:var(--border)}
 .btn-sm.warn{color:var(--orange);border-color:var(--orange)}
 .btn-sm.warn:hover{background:rgba(249,115,22,.1)}
 .btn-sm.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-.chunk-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow-y:auto;padding-right:4px}
+.chunk-list{display:flex;flex-direction:column;gap:6px;max-height:calc(100vh - 280px);overflow-y:auto;padding-right:4px}
 .chunk-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:flex-start;transition:all .15s;cursor:pointer;position:relative}
-.chunk-item:hover{border-color:var(--accent)}
-.chunk-item.excluded{opacity:.4;text-decoration:line-through;background:var(--bg)}
+.chunk-item:hover{border-color:var(--accent);background:var(--surface2)}
+.chunk-item.excluded{opacity:.35;background:var(--bg);border-color:transparent}
+.chunk-item.excluded .txt{text-decoration:line-through}
 .chunk-item.suspect{border-left:3px solid var(--orange)}
 .chunk-item .idx{font-size:11px;color:var(--text2);min-width:24px;text-align:right;padding-top:2px}
 .chunk-item .txt{font-size:13px;line-height:1.5;flex:1;white-space:pre-wrap;word-break:break-word}
 .chunk-item .txt[contenteditable]{outline:none;background:var(--surface2);border-radius:4px;padding:4px 6px}
 .chunk-item .badge{font-size:10px;background:var(--orange);color:#000;padding:2px 6px;border-radius:4px;white-space:nowrap;font-weight:600}
-.chunk-item .toggle{background:none;border:none;font-size:16px;padding:2px;cursor:pointer;color:var(--green)}
+.chunk-item .toggle{background:none;border:none;font-size:14px;padding:4px 6px;cursor:pointer;color:var(--green);border-radius:4px;transition:all .15s}
+.chunk-item .toggle:hover{background:rgba(255,255,255,.08)}
 .chunk-item.excluded .toggle{color:var(--red)}
 
 /* CHAPTERS */
@@ -84,16 +86,17 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .chapter-hdr .arrow{font-size:12px;color:var(--text2);transition:transform .2s;min-width:14px}
 .chapter-hdr.open .arrow{transform:rotate(90deg)}
 .chapter-hdr .ch-name{font-size:14px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chapter-hdr .ch-count{font-size:11px;color:var(--text2);white-space:nowrap}
+.chapter-hdr .ch-count{font-size:11px;color:var(--text2);white-space:nowrap;background:var(--surface2);padding:2px 8px;border-radius:10px}
 .chapter-hdr .ch-btns{display:flex;gap:4px}
 .chapter-hdr .ch-btns button{font-size:11px;padding:3px 8px;border-radius:4px;background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
 .chapter-hdr .ch-btns button:hover{background:var(--border);color:var(--text)}
 .chapter-hdr.auto-excluded{opacity:.5}
 .chapter-hdr.auto-excluded .ch-name{text-decoration:line-through}
 .chapter-body{display:none;padding:6px}
-.chapter-group.open .chapter-body{display:flex;flex-direction:column;gap:4px}
+.chapter-group.open .chapter-body{display:flex;flex-direction:column;gap:3px}
+.chapter-group.open{border-color:rgba(124,58,237,.3)}
 
-.gen-bar{margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.gen-bar{position:sticky;bottom:0;z-index:50;margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--bg);padding:12px 0;border-top:1px solid var(--border)}
 .btn-gen{background:var(--accent);color:#fff;padding:12px 28px;font-weight:700;font-size:15px}
 .btn-gen:hover{background:var(--accent2)}
 .btn-gen:disabled{opacity:.5;cursor:not-allowed}
