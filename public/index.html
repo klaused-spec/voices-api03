@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0a0a12">
+<link rel="manifest" href="/manifest.json">
+<title>Audiobook Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a12;--surface:#14141f;--surface2:#1e1e2e;--border:#2a2a3a;--text:#e2e2e8;--text2:#9999aa;--accent:#7c3aed;--accent2:#6d28d9;--green:#22c55e;--red:#ef4444;--yellow:#eab308;--orange:#f97316}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer;border:none;border-radius:8px;font-size:14px;font-weight:500;transition:all .15s}
+input,select,textarea{font-family:inherit;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* NAV */
+.nav{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.nav h1{font-size:16px;font-weight:700;background:linear-gradient(135deg,var(--accent),#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap}
+.nav-back{background:none;color:var(--text2);font-size:20px;padding:4px 8px}
+.nav-back:hover{color:var(--text)}
+
+/* PAGES */
+.page{display:none;padding:16px;max-width:900px;margin:0 auto}
+.page.active{display:block}
+
+/* LIBRARY */
+.lib-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.btn-new{background:var(--accent);color:#fff;padding:10px 20px;font-weight:600}
+.btn-new:hover{background:var(--accent2)}
+.book-list{display:flex;flex-direction:column;gap:10px}
+.book-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:border-color .15s}
+.book-card:hover{border-color:var(--accent)}
+.book-info h3{font-size:15px;font-weight:600;margin-bottom:4px}
+.book-info span{font-size:12px;color:var(--text2)}
+.book-actions{display:flex;gap:8px;align-items:center}
+.book-status{font-size:11px;padding:4px 10px;border-radius:20px;font-weight:600}
+.book-status.ready{background:#22c55e22;color:var(--green)}
+.book-status.generating{background:#eab30822;color:var(--yellow)}
+.book-status.pending{background:#99999922;color:var(--text2)}
+.book-status.error{background:#ef444422;color:var(--red)}
+.btn-icon{background:none;color:var(--text2);font-size:18px;padding:6px;border-radius:6px}
+.btn-icon:hover{background:var(--surface2);color:var(--text)}
+.btn-icon.danger:hover{color:var(--red)}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text2)}
+.empty-state .icon{font-size:48px;margin-bottom:12px;opacity:.5}
+.empty-state p{font-size:14px}
+
+/* EDITOR */
+.editor-section{margin-bottom:20px}
+.editor-section label{display:block;font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.drop-zone{border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;cursor:pointer;transition:all .15s}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--accent);background:rgba(124,58,237,.05)}
+.drop-zone p{color:var(--text2);font-size:14px}
+.drop-zone input{display:none}
+.config-row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
+.config-row .field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px}
+.config-row .field label{font-size:11px;color:var(--text2);font-weight:500}
+.chunks-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.chunks-toolbar .count{font-size:13px;color:var(--text2);margin-right:auto}
+.btn-sm{padding:6px 14px;font-size:12px;background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-sm:hover{background:var(--border)}
+.btn-sm.warn{color:var(--orange);border-color:var(--orange)}
+.btn-sm.warn:hover{background:rgba(249,115,22,.1)}
+.btn-sm.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chunk-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow-y:auto;padding-right:4px}
+.chunk-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:flex-start;transition:all .15s;cursor:pointer;position:relative}
+.chunk-item:hover{border-color:var(--accent)}
+.chunk-item.excluded{opacity:.4;text-decoration:line-through;background:var(--bg)}
+.chunk-item.suspect{border-left:3px solid var(--orange)}
+.chunk-item .idx{font-size:11px;color:var(--text2);min-width:24px;text-align:right;padding-top:2px}
+.chunk-item .txt{font-size:13px;line-height:1.5;flex:1;white-space:pre-wrap;word-break:break-word}
+.chunk-item .txt[contenteditable]{outline:none;background:var(--surface2);border-radius:4px;padding:4px 6px}
+.chunk-item .badge{font-size:10px;background:var(--orange);color:#000;padding:2px 6px;border-radius:4px;white-space:nowrap;font-weight:600}
+.chunk-item .toggle{background:none;border:none;font-size:16px;padding:2px;cursor:pointer;color:var(--green)}
+.chunk-item.excluded .toggle{color:var(--red)}
+.gen-bar{margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.btn-gen{background:var(--accent);color:#fff;padding:12px 28px;font-weight:700;font-size:15px}
+.btn-gen:hover{background:var(--accent2)}
+.btn-gen:disabled{opacity:.5;cursor:not-allowed}
+.progress-box{flex:1;min-width:200px}
+.progress-track{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .3s}
+.progress-label{font-size:12px;color:var(--text2);margin-top:4px}
+
+/* PLAYER */
+.player-wrap{display:flex;flex-direction:column;height:calc(100vh - 60px)}
+.player-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.player-header h2{font-size:18px;font-weight:700}
+.player-header select{max-width:200px}
+.player-text{flex:1;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;font-size:16px;line-height:1.8;margin-bottom:16px;min-height:200px}
+.player-text .chunk-active{color:var(--text);font-weight:500}
+.player-text .chunk-dim{color:var(--text2);opacity:.4;font-size:14px;margin-top:12px}
+.player-progress{margin-bottom:12px}
+.player-progress .info{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:4px}
+.seek-bar{width:100%;height:6px;background:var(--surface2);border-radius:3px;cursor:pointer;position:relative;-webkit-appearance:none;appearance:none}
+.seek-bar::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;margin-top:-4px}
+.seek-bar::-webkit-slider-runnable-track{height:6px;background:var(--surface2);border-radius:3px}
+.player-controls{display:flex;justify-content:center;align-items:center;gap:16px;padding:12px 0}
+.ctrl-btn{background:var(--surface);border:1px solid var(--border);color:var(--text);width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px}
+.ctrl-btn:hover{background:var(--surface2);border-color:var(--accent)}
+.ctrl-btn.play{width:60px;height:60px;font-size:24px;background:var(--accent);border-color:var(--accent);color:#fff}
+.ctrl-btn.play:hover{background:var(--accent2)}
+.speed-ctrl{display:flex;align-items:center;gap:8px;justify-content:center;padding:8px 0}
+.speed-ctrl span{font-size:12px;color:var(--text2)}
+.speed-btn{background:var(--surface2);color:var(--text);padding:4px 10px;font-size:12px;border-radius:16px;border:1px solid var(--border)}
+.speed-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.player-book-progress{font-size:12px;color:var(--text2);text-align:center;padding:4px 0}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <button class="nav-back" id="navBack" style="display:none" onclick="goBack()">&#8592;</button>
+  <h1>Audiobook Studio</h1>
+</nav>
+
+<!-- LIBRARY PAGE -->
+<div class="page active" id="pageLibrary">
+  <div class="lib-header">
+    <div><h2 style="font-size:20px">Biblioteca</h2></div>
+    <button class="btn-new" onclick="goEditor('new')">+ Novo Livro</button>
+  </div>
+  <div class="book-list" id="bookList"></div>
+</div>
+
+<!-- EDITOR PAGE -->
+<div class="page" id="pageEditor">
+  <div class="editor-section">
+    <label>Importar PDF</label>
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('pdfInput').click()">
+      <p id="dropLabel">Arraste um PDF aqui ou clique para selecionar</p>
+      <input type="file" id="pdfInput" accept=".pdf">
+    </div>
+  </div>
+
+  <div class="editor-section">
+    <div class="config-row">
+      <div class="field">
+        <label>Título do Livro</label>
+        <input type="text" id="bookTitle" placeholder="Nome do livro">
+      </div>
+      <div class="field">
+        <label>Voz</label>
+        <select id="voiceSelect"></select>
+      </div>
+      <div class="field" style="max-width:140px">
+        <label>Modelo</label>
+        <select id="modelSelect">
+          <option value="gemini-2.5-flash-preview-tts">Flash (econômico)</option>
+          <option value="gemini-2.5-pro-preview-tts">Pro (HD)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="editor-section" id="chunksSection" style="display:none">
+    <label>Parágrafos</label>
+    <div class="chunks-toolbar">
+      <span class="count" id="chunksCount"></span>
+      <button class="btn-sm" onclick="toggleAll(true)">Incluir todos</button>
+      <button class="btn-sm" onclick="toggleAll(false)">Excluir todos</button>
+      <button class="btn-sm warn" onclick="autoDetect()">Auto-detectar lixo</button>
+    </div>
+    <div class="chunk-list" id="chunkList"></div>
+
+    <div class="gen-bar">
+      <button class="btn-gen" id="btnGenerate" onclick="handleGenerate()">Gerar Audiobook</button>
+      <div class="progress-box" id="progressBox" style="display:none">
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-label" id="progressLabel"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PLAYER PAGE -->
+<div class="page" id="pagePlayer">
+  <div class="player-wrap">
+    <div class="player-header">
+      <h2 id="playerTitle">-</h2>
+      <select id="bookSwitch" onchange="switchBook(this.value)"></select>
+    </div>
+
+    <div class="player-text" id="playerText"></div>
+
+    <div class="player-progress">
+      <div class="info">
+        <span id="timeElapsed">0:00</span>
+        <span id="timeDuration">0:00</span>
+      </div>
+      <input type="range" class="seek-bar" id="seekBar" min="0" max="100" value="0" oninput="seekAudio(this.value)">
+    </div>
+
+    <div class="player-controls">
+      <button class="ctrl-btn" onclick="goToStart()" title="Início">&#9198;</button>
+      <button class="ctrl-btn" onclick="playPrev()" title="Anterior">&#9664;</button>
+      <button class="ctrl-btn play" id="btnPlay" onclick="togglePlay()">&#9654;</button>
+      <button class="ctrl-btn" onclick="playNext()" title="Próximo">&#9654;&#9654;</button>
+    </div>
+
+    <div class="speed-ctrl" id="speedCtrl"></div>
+    <div class="player-book-progress" id="bookProgress"></div>
+  </div>
+</div>
+
+<audio id="audioEl" preload="auto"></audio>
+
+<script>
+const API = '';
+const AUTH = '';
+const audioEl = document.getElementById('audioEl');
+
+// ─── STATE ────────────────────────────────────────
+let chunks = [];
+let currentBook = null;
+let currentChunkIdx = 0;
+let isPlaying = false;
+let playbackRate = 1;
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+
+// ─── ROUTING ──────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page' + name).classList.add('active');
+  document.getElementById('navBack').style.display = name === 'Library' ? 'none' : '';
+}
+
+function goLibrary() { showPage('Library'); loadBooks(); window.location.hash = '#/library'; }
+
+function goEditor(id) {
+  showPage('Editor');
+  window.location.hash = id === 'new' ? '#/editor/new' : '#/editor/' + id;
+  if (id === 'new') resetEditor();
+  else loadBookForEdit(id);
+}
+
+function goPlayer(id) {
+  showPage('Player');
+  window.location.hash = '#/player/' + id;
+  loadBookForPlay(id);
+}
+
+function goBack() {
+  const hash = window.location.hash;
+  if (hash.startsWith('#/player/') || hash.startsWith('#/editor/')) goLibrary();
+  else goLibrary();
+}
+
+window.addEventListener('hashchange', () => {
+  const h = window.location.hash;
+  if (h.startsWith('#/editor/')) goEditor(h.split('/')[2]);
+  else if (h.startsWith('#/player/')) goPlayer(h.split('/')[2]);
+  else goLibrary();
+});
+
+// ─── API HELPERS ──────────────────────────────────
+function headers(extra = {}) {
+  const h = { ...extra };
+  if (AUTH) h['Authorization'] = 'Bearer ' + AUTH;
+  return h;
+}
+
+async function api(method, path, body) {
+  const opts = { method, headers: headers() };
+  if (body instanceof FormData) {
+    opts.body = body;
+  } else if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const r = await fetch(API + path, opts);
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
+  return r;
+}
+
+// ─── LIBRARY ──────────────────────────────────────
+async function loadBooks() {
+  try {
+    const data = await (await api('GET', '/api/books')).json();
+    const list = document.getElementById('bookList');
+    if (!data.books || data.books.length === 0) {
+      list.innerHTML = '<div class="empty-state"><div class="icon">&#128218;</div><p>Nenhum livro ainda. Clique em "+ Novo Livro" para começar.</p></div>';
+      return;
+    }
+    list.innerHTML = data.books.map(b => `
+      <div class="book-card" onclick="goPlayer('${b.id}')">
+        <div class="book-info">
+          <h3>${esc(b.title)}</h3>
+          <span>${b.totalChunks} parágrafos &middot; ${new Date(b.createdAt).toLocaleDateString('pt-BR')}</span>
+        </div>
+        <div class="book-actions">
+          <span class="book-status ${b.status}">${b.status === 'ready' ? 'Pronto' : b.status === 'generating' ? 'Gerando...' : b.status === 'error' ? 'Erro' : 'Pendente'}</span>
+          <button class="btn-icon" onclick="event.stopPropagation(); goEditor('${b.id}')" title="Editar">&#9998;</button>
+          <button class="btn-icon danger" onclick="event.stopPropagation(); deleteBook('${b.id}')" title="Excluir">&#128465;</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function deleteBook(id) {
+  if (!confirm('Excluir este livro e todos os áudios?')) return;
+  await api('DELETE', '/api/books/' + id);
+  loadBooks();
+}
+
+// ─── VOICES ───────────────────────────────────────
+async function loadVoices() {
+  try {
+    const data = await (await fetch(API + '/v1/voices')).json();
+    const sel = document.getElementById('voiceSelect');
+    const favs = ['Kore','Zephyr','Puck','Charon','Aoede','Fenrir','Leda'];
+    const sorted = [...data.voices].sort((a, b) => {
+      const ai = favs.indexOf(a.name), bi = favs.indexOf(b.name);
+      if (ai >= 0 && bi >= 0) return ai - bi;
+      if (ai >= 0) return -1; if (bi >= 0) return 1;
+      return a.name.localeCompare(b.name);
+    });
+    sel.innerHTML = sorted.map(v => `<option value="${v.name}" ${v.name === 'Kore' ? 'selected' : ''}>${v.name}${favs.includes(v.name) ? ' ★' : ''}</option>`).join('');
+  } catch {}
+}
+
+// ─── EDITOR ───────────────────────────────────────
+function resetEditor() {
+  chunks = [];
+  document.getElementById('bookTitle').value = '';
+  document.getElementById('chunksSection').style.display = 'none';
+  document.getElementById('dropZone').style.display = '';
+  document.getElementById('progressBox').style.display = 'none';
+  document.getElementById('dropLabel').textContent = 'Arraste um PDF aqui ou clique para selecionar';
+}
+
+async function loadBookForEdit(id) {
+  try {
+    const book = await (await api('GET', '/api/books/' + id)).json();
+    document.getElementById('bookTitle').value = book.title;
+    document.getElementById('voiceSelect').value = book.voice;
+    document.getElementById('modelSelect').value = book.model;
+    chunks = book.chunks.map(c => ({ text: c.text, excluded: false, suspect: false }));
+    document.getElementById('dropZone').style.display = 'none';
+    renderChunks();
+  } catch (e) { console.error(e); goLibrary(); }
+}
+
+// PDF upload
+const dropZone = document.getElementById('dropZone');
+const pdfInput = document.getElementById('pdfInput');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
+pdfInput.addEventListener('change', () => { if (pdfInput.files[0]) handleFile(pdfInput.files[0]); });
+
+async function handleFile(file) {
+  if (!file || !file.name.toLowerCase().endsWith('.pdf')) return alert('Selecione um arquivo PDF');
+  document.getElementById('dropLabel').textContent = 'Processando ' + file.name + '...';
+
+  const form = new FormData();
+  form.append('file', file);
+
+  try {
+    const data = await (await api('POST', '/api/upload-pdf', form)).json();
+    chunks = data.paragraphs.map(t => ({ text: t, excluded: false, suspect: false }));
+    if (!document.getElementById('bookTitle').value) {
+      document.getElementById('bookTitle').value = file.name.replace(/\.pdf$/i, '');
+    }
+    document.getElementById('dropLabel').textContent = `${file.name} — ${data.pages} páginas, ${data.totalParagraphs} parágrafos`;
+    autoDetect();
+    renderChunks();
+  } catch (e) {
+    document.getElementById('dropLabel').textContent = 'Erro: ' + e.message;
+  }
+}
+
+function renderChunks() {
+  document.getElementById('chunksSection').style.display = '';
+  const included = chunks.filter(c => !c.excluded).length;
+  document.getElementById('chunksCount').textContent = `${included} incluídos de ${chunks.length} total`;
+
+  const list = document.getElementById('chunkList');
+  list.innerHTML = chunks.map((c, i) => `
+    <div class="chunk-item ${c.excluded ? 'excluded' : ''} ${c.suspect ? 'suspect' : ''}" data-idx="${i}">
+      <span class="idx">${i + 1}</span>
+      <button class="toggle" onclick="toggleChunk(${i})">${c.excluded ? '&#10060;' : '&#9989;'}</button>
+      <div class="txt" contenteditable="true" onblur="updateText(${i}, this.textContent)">${esc(c.text)}</div>
+      ${c.suspect ? '<span class="badge">Sugestão</span>' : ''}
+    </div>
+  `).join('');
+}
+
+function toggleChunk(idx) {
+  chunks[idx].excluded = !chunks[idx].excluded;
+  renderChunks();
+}
+
+function toggleAll(include) {
+  chunks.forEach(c => c.excluded = !include);
+  renderChunks();
+}
+
+function updateText(idx, text) {
+  chunks[idx].text = text.trim();
+}
+
+function autoDetect() {
+  const patterns = [
+    /^(cap[ií]tulo|chapter|introdu[çc][aã]o|introduction|pref[aá]cio|preface|sum[aá]rio|contents|agradecimentos|acknowledgements|refer[eê]ncias|references|bibliografia|bibliography|ap[eê]ndice|appendix|[ií]ndice|index)\b/i,
+    /^\d+$/, // bare page numbers
+    /^[-–—_=]{3,}$/, // dividers
+    /^(fig(ura)?|table|tabela|quadro|gr[aá]fico)\s*\d/i,
+    /^[A-ZÁÉÍÓÚÀÂÊÔÃÕÇÜ\s]{5,}$/, // all-caps (likely headers)
+  ];
+
+  chunks.forEach(c => {
+    c.suspect = false;
+    const t = c.text.trim();
+    if (t.split(/\s+/).length <= 3) { c.suspect = true; return; }
+    for (const p of patterns) {
+      if (p.test(t)) { c.suspect = true; return; }
+    }
+  });
+  renderChunks();
+}
+
+function excludeSuspects() {
+  chunks.forEach(c => { if (c.suspect) c.excluded = true; });
+  renderChunks();
+}
+
+async function handleGenerate() {
+  const title = document.getElementById('bookTitle').value.trim();
+  if (!title) return alert('Preencha o título do livro');
+  const included = chunks.filter(c => !c.excluded);
+  if (included.length === 0) return alert('Nenhum parágrafo incluído');
+
+  const voice = document.getElementById('voiceSelect').value;
+  const model = document.getElementById('modelSelect').value;
+
+  document.getElementById('btnGenerate').disabled = true;
+  document.getElementById('progressBox').style.display = '';
+
+  try {
+    const book = await (await api('POST', '/api/books', {
+      title, voice, model, chunks: included.map(c => c.text)
+    })).json();
+
+    await api('POST', `/api/books/${book.id}/generate`);
+    watchProgress(book.id);
+  } catch (e) {
+    alert('Erro: ' + e.message);
+    document.getElementById('btnGenerate').disabled = false;
+  }
+}
+
+function watchProgress(bookId) {
+  const es = new EventSource(API + `/api/books/${bookId}/progress`);
+  es.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    const pct = d.total > 0 ? Math.round(d.done / d.total * 100) : 0;
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressLabel').textContent = `${d.done}/${d.total} parágrafos (${pct}%)${d.errors > 0 ? ` — ${d.errors} erros` : ''}`;
+
+    if (d.status === 'ready' || d.status === 'error') {
+      es.close();
+      document.getElementById('btnGenerate').disabled = false;
+      if (d.status === 'ready') {
+        if (confirm('Audiobook gerado! Abrir no player?')) goPlayer(bookId);
+      }
+    }
+  };
+  es.onerror = () => { es.close(); document.getElementById('btnGenerate').disabled = false; };
+}
+
+// ─── PLAYER ───────────────────────────────────────
+async function loadBookForPlay(id) {
+  try {
+    const book = await (await api('GET', '/api/books/' + id)).json();
+    currentBook = book;
+
+    document.getElementById('playerTitle').textContent = book.title;
+    initSpeedControls();
+    loadBookSwitcher(id);
+
+    const saved = loadPosition(id);
+    currentChunkIdx = saved.chunkIdx;
+    renderPlayerText();
+    loadChunkAudio(currentChunkIdx, saved.time);
+    updateBookProgress();
+  } catch (e) { console.error(e); goLibrary(); }
+}
+
+async function loadBookSwitcher(currentId) {
+  try {
+    const data = await (await api('GET', '/api/books')).json();
+    const sel = document.getElementById('bookSwitch');
+    sel.innerHTML = data.books
+      .filter(b => b.status === 'ready')
+      .map(b => `<option value="${b.id}" ${b.id === currentId ? 'selected' : ''}>${esc(b.title)}</option>`)
+      .join('');
+  } catch {}
+}
+
+function switchBook(id) { if (id) goPlayer(id); }
+
+function renderPlayerText() {
+  if (!currentBook) return;
+  const el = document.getElementById('playerText');
+  const chunks = currentBook.chunks;
+  const active = chunks[currentChunkIdx];
+  let html = '';
+  if (currentChunkIdx > 0) {
+    html += `<div class="chunk-dim">${esc(chunks[currentChunkIdx - 1].text)}</div>`;
+  }
+  html += `<div class="chunk-active">${esc(active ? active.text : '')}</div>`;
+  if (currentChunkIdx < chunks.length - 1) {
+    html += `<div class="chunk-dim">${esc(chunks[currentChunkIdx + 1].text)}</div>`;
+  }
+  el.innerHTML = html;
+  el.scrollTop = 0;
+}
+
+function loadChunkAudio(idx, startTime = 0) {
+  if (!currentBook || idx < 0 || idx >= currentBook.chunks.length) return;
+  const chunk = currentBook.chunks[idx];
+  if (!chunk.generated) return;
+  currentChunkIdx = idx;
+  audioEl.src = API + `/api/books/${currentBook.id}/audio/${chunk.audioFile}`;
+  audioEl.playbackRate = playbackRate;
+  audioEl.currentTime = 0;
+  audioEl.onloadedmetadata = () => {
+    if (startTime > 0 && startTime < audioEl.duration) audioEl.currentTime = startTime;
+    document.getElementById('timeDuration').textContent = fmtTime(audioEl.duration);
+  };
+  renderPlayerText();
+  updateBookProgress();
+}
+
+function togglePlay() {
+  if (audioEl.paused) {
+    audioEl.play();
+    isPlaying = true;
+    document.getElementById('btnPlay').innerHTML = '&#9646;&#9646;';
+  } else {
+    audioEl.pause();
+    isPlaying = false;
+    document.getElementById('btnPlay').innerHTML = '&#9654;';
+    savePosition();
+  }
+}
+
+function playNext() {
+  if (!currentBook) return;
+  const next = findNextGenerated(currentChunkIdx + 1, 1);
+  if (next >= 0) { loadChunkAudio(next); if (isPlaying) audioEl.play(); }
+}
+
+function playPrev() {
+  if (!currentBook) return;
+  if (audioEl.currentTime > 3) { audioEl.currentTime = 0; return; }
+  const prev = findNextGenerated(currentChunkIdx - 1, -1);
+  if (prev >= 0) { loadChunkAudio(prev); if (isPlaying) audioEl.play(); }
+}
+
+function goToStart() {
+  if (!currentBook) return;
+  const first = findNextGenerated(0, 1);
+  if (first >= 0) { loadChunkAudio(first); if (isPlaying) audioEl.play(); }
+}
+
+function findNextGenerated(start, dir) {
+  if (!currentBook) return -1;
+  const chunks = currentBook.chunks;
+  for (let i = start; i >= 0 && i < chunks.length; i += dir) {
+    if (chunks[i].generated) return i;
+  }
+  return -1;
+}
+
+function seekAudio(val) {
+  if (audioEl.duration) audioEl.currentTime = (val / 100) * audioEl.duration;
+}
+
+audioEl.addEventListener('timeupdate', () => {
+  if (!audioEl.duration) return;
+  const pct = (audioEl.currentTime / audioEl.duration) * 100;
+  document.getElementById('seekBar').value = pct;
+  document.getElementById('timeElapsed').textContent = fmtTime(audioEl.currentTime);
+});
+
+audioEl.addEventListener('ended', () => playNext());
+
+// Save position periodically
+setInterval(() => { if (isPlaying) savePosition(); }, 3000);
+window.addEventListener('beforeunload', savePosition);
+document.addEventListener('visibilitychange', () => { if (document.hidden) savePosition(); });
+
+// Speed
+function initSpeedControls() {
+  const el = document.getElementById('speedCtrl');
+  el.innerHTML = '<span>Velocidade:</span>' + SPEEDS.map(s =>
+    `<button class="speed-btn ${s === playbackRate ? 'active' : ''}" onclick="setSpeed(${s})">${s}x</button>`
+  ).join('');
+}
+
+function setSpeed(s) {
+  playbackRate = s;
+  audioEl.playbackRate = s;
+  localStorage.setItem('ab_speed', s);
+  initSpeedControls();
+}
+
+function updateBookProgress() {
+  if (!currentBook) return;
+  const total = currentBook.chunks.length;
+  document.getElementById('bookProgress').textContent = `Parágrafo ${currentChunkIdx + 1} de ${total}`;
+}
+
+// ─── POSITION PERSISTENCE ─────────────────────────
+function savePosition() {
+  if (!currentBook) return;
+  const data = { chunkIdx: currentChunkIdx, time: audioEl.currentTime || 0, ts: Date.now() };
+  localStorage.setItem('ab_pos_' + currentBook.id, JSON.stringify(data));
+}
+
+function loadPosition(bookId) {
+  try {
+    const data = JSON.parse(localStorage.getItem('ab_pos_' + bookId));
+    return data || { chunkIdx: 0, time: 0 };
+  } catch { return { chunkIdx: 0, time: 0 }; }
+}
+
+// ─── UTIL ─────────────────────────────────────────
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function fmtTime(s) {
+  if (!s || isNaN(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return m + ':' + String(sec).padStart(2, '0');
+}
+
+// ─── INIT ─────────────────────────────────────────
+(async function init() {
+  const savedSpeed = parseFloat(localStorage.getItem('ab_speed'));
+  if (savedSpeed && SPEEDS.includes(savedSpeed)) playbackRate = savedSpeed;
+
+  await loadVoices();
+
+  const h = window.location.hash;
+  if (h.startsWith('#/editor/')) goEditor(h.split('/')[2]);
+  else if (h.startsWith('#/player/')) goPlayer(h.split('/')[2]);
+  else goLibrary();
+})();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
