@@ -70,7 +70,10 @@ async function generateBook(bookId) {
 
       try {
         chunkStatus[chunkId] = 'generating';
-        const result = await tts.synthesize(chunk.text, manifest.voice, manifest.model);
+        const result = await Promise.race([
+          tts.synthesize(chunk.text, manifest.voice, manifest.model),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('Chunk timeout (90s)')), 90000))
+        ]);
         const mp3Buf = mp3.pcmToMp3(result.pcm);
         const audioFile = chunk.audioFile;
         fs.writeFileSync(books.audioPath(bookId, audioFile), mp3Buf);
