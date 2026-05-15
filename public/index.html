@@ -690,7 +690,7 @@ function watchProgress(bookId) {
     });
   }
 
-  const es = new EventSource(API + `/api/books/${bookId}/progress`);
+  const es = new EventSource(API + `/api/books/${bookId}/progress${AUTH ? '?token=' + encodeURIComponent(AUTH) : ''}`);
   es.onmessage = (e) => {
     const d = JSON.parse(e.data);
     const pct = d.total > 0 ? Math.round(d.done / d.total * 100) : 0;

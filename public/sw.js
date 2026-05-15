@@ -1,4 +1,4 @@
-const CACHE_NAME = 'audiobook-studio-v4';
+const CACHE_NAME = 'audiobook-studio-v5';
 const SHELL = ['/', '/manifest.json'];
 
 self.addEventListener('install', (e) => {
