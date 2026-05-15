@@ -308,6 +308,11 @@ function goEditor(id) {
 }
 
 function goPlayer(id) {
+  // If running inside Android app, use native player
+  if (typeof AndroidApp !== 'undefined' && AndroidApp.playBook) {
+    AndroidApp.playBook(id);
+    return;
+  }
   showPage('Player');
   window.location.hash = '#/player/' + id;
   loadBookForPlay(id);

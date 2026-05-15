@@ -1,0 +1,4 @@
+-keep class dev.kkirner.audiobook.data.** { *; }
+-keepattributes *Annotation*
+-dontwarn okhttp3.**
+-dontwarn kotlinx.serialization.**
