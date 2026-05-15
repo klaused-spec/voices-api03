@@ -65,19 +65,17 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .btn-sm.warn{color:var(--orange);border-color:var(--orange)}
 .btn-sm.warn:hover{background:rgba(249,115,22,.1)}
 .btn-sm.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-.chunk-list{display:flex;flex-direction:column;gap:6px;max-height:calc(100vh - 280px);overflow-y:auto;padding-right:4px}
-.chunk-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:flex-start;transition:all .15s;cursor:pointer;position:relative}
-.chunk-item:hover{border-color:var(--accent);background:var(--surface2)}
-.chunk-item.excluded{opacity:.35;background:var(--bg);border-color:transparent}
-.chunk-item.excluded .txt{text-decoration:line-through}
-.chunk-item.suspect{border-left:3px solid var(--orange)}
-.chunk-item .idx{font-size:11px;color:var(--text2);min-width:24px;text-align:right;padding-top:2px}
-.chunk-item .txt{font-size:13px;line-height:1.5;flex:1;white-space:pre-wrap;word-break:break-word}
-.chunk-item .txt[contenteditable]{outline:none;background:var(--surface2);border-radius:4px;padding:4px 6px}
-.chunk-item .badge{font-size:10px;background:var(--orange);color:#000;padding:2px 6px;border-radius:4px;white-space:nowrap;font-weight:600}
-.chunk-item .toggle{background:none;border:none;font-size:14px;padding:4px 6px;cursor:pointer;color:var(--green);border-radius:4px;transition:all .15s}
-.chunk-item .toggle:hover{background:rgba(255,255,255,.08)}
-.chunk-item.excluded .toggle{color:var(--red)}
+.chunk-list{max-height:calc(100vh - 260px);overflow-y:auto;padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;font-size:15px;line-height:1.8;color:var(--text)}
+.chunk-item{padding:2px 4px;border-radius:4px;cursor:pointer;transition:all .2s;display:inline;position:relative}
+.chunk-item:hover{background:rgba(124,58,237,.12)}
+.chunk-item.excluded{opacity:.3;text-decoration:line-through;color:var(--text2)}
+.chunk-item.excluded:hover{opacity:.5}
+.chunk-item.suspect{background:rgba(249,115,22,.08);border-bottom:2px solid var(--orange)}
+.chunk-item .idx{display:none}
+.chunk-item .txt{display:inline}
+.chunk-item .badge{font-size:9px;background:var(--orange);color:#000;padding:1px 5px;border-radius:3px;margin-left:2px;vertical-align:super;font-weight:600}
+.chunk-item .toggle{display:none}
+.chunk-para-break{display:block;height:12px}
 
 /* CHAPTERS */
 .chapter-group{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px}
@@ -92,8 +90,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .chapter-hdr .ch-btns button:hover{background:var(--border);color:var(--text)}
 .chapter-hdr.auto-excluded{opacity:.5}
 .chapter-hdr.auto-excluded .ch-name{text-decoration:line-through}
-.chapter-body{display:none;padding:6px}
-.chapter-group.open .chapter-body{display:flex;flex-direction:column;gap:3px}
+.chapter-body{display:none;padding:12px 20px}
+.chapter-group.open .chapter-body{display:block;font-size:15px;line-height:1.8}
 .chapter-group.open{border-color:rgba(124,58,237,.3)}
 
 .gen-bar{position:sticky;bottom:0;z-index:50;margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--bg);padding:12px 0;border-top:1px solid var(--border)}
@@ -460,12 +458,7 @@ function renderChunks() {
 }
 
 function renderChunkItem(c, i) {
-  return `<div class="chunk-item ${c.excluded ? 'excluded' : ''} ${c.suspect ? 'suspect' : ''}" data-idx="${i}">
-    <span class="idx">${i + 1}</span>
-    <button class="toggle" onclick="toggleChunk(${i})">${c.excluded ? '&#10060;' : '&#9989;'}</button>
-    <div class="txt" contenteditable="true" onblur="updateText(${i}, this.textContent)">${esc(c.text)}</div>
-    ${c.suspect ? '<span class="badge">Auto</span>' : ''}
-  </div>`;
+  return `<span class="chunk-item ${c.excluded ? 'excluded' : ''} ${c.suspect ? 'suspect' : ''}" data-idx="${i}" onclick="toggleChunk(${i})" title="Clique para ${c.excluded ? 'incluir' : 'excluir'} &#8212; parágrafo ${i+1}">${esc(c.text)}${c.suspect ? '<span class="badge">Auto</span>' : ''}</span><span class="chunk-para-break"></span>`;
 }
 
 function toggleChapter(ci) {
