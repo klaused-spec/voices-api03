@@ -53,12 +53,15 @@ async function generateBook(bookId) {
   if (!manifest) return;
 
   books.update(bookId, { status: 'generating' });
-  const concurrency = 2;
+  const concurrency = 1;
   const queue = manifest.chunks.filter(c => !c.generated).map(c => c.id);
   let errors = 0;
+  const MAX_RETRIES = 2;
+  const CHUNK_TIMEOUT = 150000; // 150s
 
   const chunkStatus = {};
-  manifest.chunks.forEach(c => { chunkStatus[c.id] = c.generated ? 'done' : 'pending'; });
+  const chunkRetries = {};
+  manifest.chunks.forEach(c => { chunkStatus[c.id] = c.generated ? 'done' : 'pending'; chunkRetries[c.id] = 0; });
   const progress = { done: manifest.generatedChunks, total: manifest.totalChunks, errors: 0, chunkStatus };
   activeJobs.set(bookId, progress);
 
@@ -72,7 +75,7 @@ async function generateBook(bookId) {
         chunkStatus[chunkId] = 'generating';
         const result = await Promise.race([
           tts.synthesize(chunk.text, manifest.voice, manifest.model),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('Chunk timeout (90s)')), 90000))
+          new Promise((_, rej) => setTimeout(() => rej(new Error('Chunk timeout (150s)')), CHUNK_TIMEOUT))
         ]);
         const mp3Buf = mp3.pcmToMp3(result.pcm);
         const audioFile = chunk.audioFile;
@@ -81,10 +84,19 @@ async function generateBook(bookId) {
         chunkStatus[chunkId] = 'done';
         progress.done++;
       } catch (err) {
-        chunkStatus[chunkId] = 'error:' + (err.message || String(err)).substring(0, 100);
-        progress.errors++;
-        errors++;
-        console.error(`[gen] book=${bookId} chunk=${chunkId} err: ${err.message || err}`);
+        const attempt = ++chunkRetries[chunkId];
+        const errMsg = (err.message || String(err)).substring(0, 100);
+        console.error(`[gen] book=${bookId} chunk=${chunkId} attempt=${attempt}/${MAX_RETRIES} err: ${errMsg}`);
+        if (attempt < MAX_RETRIES) {
+          chunkStatus[chunkId] = 'pending';
+          queue.push(chunkId); // re-enqueue for retry
+          console.log(`[gen] chunk=${chunkId} re-queued (attempt ${attempt + 1})`);
+          await new Promise(r => setTimeout(r, 3000)); // wait 3s before retry
+        } else {
+          chunkStatus[chunkId] = 'error:' + errMsg;
+          progress.errors++;
+          errors++;
+        }
       }
     }
   }
