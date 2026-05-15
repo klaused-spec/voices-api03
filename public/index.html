@@ -65,7 +65,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .btn-sm.warn{color:var(--orange);border-color:var(--orange)}
 .btn-sm.warn:hover{background:rgba(249,115,22,.1)}
 .btn-sm.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-.chunk-list{max-height:calc(100vh - 260px);overflow-y:auto;padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;font-size:15px;line-height:1.8;color:var(--text)}
+.editor-layout{display:flex;gap:12px;max-height:calc(100vh - 260px)}
+.chapter-sidebar{width:200px;min-width:160px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding:8px 0}
+.ch-nav{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;cursor:pointer;transition:all .15s;font-size:12px;line-height:1.3;color:var(--text2);border:none;background:none;text-align:left;width:100%}
+.ch-nav:hover{background:var(--surface2);color:var(--text)}
+.ch-nav.active{background:var(--accent);color:#fff}
+.ch-nav.excluded{opacity:.35;text-decoration:line-through}
+.ch-nav .ch-toggle{flex-shrink:0;width:18px;height:18px;border-radius:4px;border:1px solid var(--border);background:var(--green);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
+.ch-nav.excluded .ch-toggle{background:var(--red)}
+.ch-nav .ch-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chunk-list{flex:1;overflow-y:auto;padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;font-size:15px;line-height:1.8;color:var(--text)}
 .chunk-item{padding:2px 4px;border-radius:4px;cursor:pointer;transition:all .2s;display:inline;position:relative}
 .chunk-item:hover{background:rgba(124,58,237,.12)}
 .chunk-item.excluded{opacity:.3;text-decoration:line-through;color:var(--text2)}
@@ -183,7 +192,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
       <button class="btn-sm" onclick="toggleAll(true)">Incluir todos</button>
       <button class="btn-sm" onclick="toggleAll(false)">Excluir todos</button>
     </div>
-    <div class="chunk-list" id="chunkList"></div>
+    <div class="editor-layout">
+      <div class="chapter-sidebar" id="chapterSidebar"></div>
+      <div class="chunk-list" id="chunkList"></div>
+    </div>
 
     <div class="gen-bar">
       <button class="btn-gen" id="btnGenerate" onclick="handleGenerate()">Gerar Audiobook</button>
@@ -422,11 +434,22 @@ function renderChunks() {
   document.getElementById('chunksCount').textContent = `${included} incluídos de ${chunks.length} total`;
 
   const list = document.getElementById('chunkList');
+  const sidebar = document.getElementById('chapterSidebar');
 
   if (chapters.length === 0) {
+    sidebar.style.display = 'none';
     list.innerHTML = chunks.map((c, i) => renderChunkItem(c, i)).join('');
     return;
   }
+
+  sidebar.style.display = '';
+  sidebar.innerHTML = chapters.map((ch, ci) => {
+    const exCls = ch.autoExcluded ? 'excluded' : '';
+    return `<button class="ch-nav ${exCls}" data-ch="${ci}">
+      <span class="ch-toggle" onclick="event.stopPropagation(); chapterToggleAll(${ci}, ${ch.autoExcluded})" title="${ch.autoExcluded ? 'Incluir' : 'Excluir'}">${ch.autoExcluded ? '✕' : '✓'}</span>
+      <span class="ch-label" onclick="scrollToChapter(${ci})" title="${esc(ch.name)}">${esc(ch.name)}</span>
+    </button>`;
+  }).join('');
 
   list.innerHTML = chapters.map((ch, ci) => {
     const chunkSlice = chunks.slice(ch.startIdx, ch.endIdx + 1);
@@ -436,8 +459,13 @@ function renderChunks() {
 
     const items = chunkSlice.map((c, j) => renderChunkItem(c, ch.startIdx + j)).join('');
 
-    return `<span class="chapter-title ${autoClass}" onclick="chapterToggleAll(${ci}, ${ch.autoExcluded})" title="Clique para ${ch.autoExcluded ? 'incluir' : 'excluir'} todo o capítulo">${esc(ch.name)}<span class="ch-count">${chIncluded}/${chTotal}</span></span>${items}`;
+    return `<span class="chapter-title ${autoClass}" id="ch-anchor-${ci}">${esc(ch.name)}<span class="ch-count">${chIncluded}/${chTotal}</span></span>${items}`;
   }).join('');
+}
+
+function scrollToChapter(ci) {
+  const anchor = document.getElementById('ch-anchor-' + ci);
+  if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function renderChunkItem(c, i) {
