@@ -79,7 +79,9 @@ async function generateBook(bookId) {
         ]);
         const mp3Buf = mp3.pcmToMp3(result.pcm);
         const audioFile = chunk.audioFile;
-        fs.writeFileSync(books.audioPath(bookId, audioFile), mp3Buf);
+        const audioFullPath = books.audioPath(bookId, audioFile);
+        fs.writeFileSync(audioFullPath, mp3Buf);
+        console.log(`[gen] saved ${audioFullPath} (${mp3Buf.length} bytes)`);
         books.updateChunk(bookId, chunkId, { generated: true });
         chunkStatus[chunkId] = 'done';
         progress.done++;
