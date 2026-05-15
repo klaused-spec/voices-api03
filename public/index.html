@@ -696,41 +696,38 @@ function watchProgress(bookId) {
     });
   }
 
-  const es = new EventSource(API + `/api/books/${bookId}/progress${AUTH ? '?token=' + encodeURIComponent(AUTH) : ''}`);
-  es.onmessage = (e) => {
-    const d = JSON.parse(e.data);
+  function handleData(d) {
     const pct = d.total > 0 ? Math.round(d.done / d.total * 100) : 0;
     const elapsed = Math.round((Date.now() - startTime) / 1000);
     document.getElementById('progressFill').style.width = pct + '%';
     document.getElementById('progressLabel').textContent = `${d.done}/${d.total} (${pct}%) \u2014 ${elapsed}s`;
 
-    // Log new completions
     if (d.done > prevDone) {
       for (let i = prevDone; i < d.done; i++) {
         const preview = included[i] ? included[i].text.substring(0, 50) : '';
-        addLog('ok', `\u2713 Par\u00E1grafo ${i + 1}: ${preview}${preview.length >= 50 ? '\u2026' : ''}`);
+        addLog('ok', `\u2713 Par\u00e1grafo ${i + 1}: ${preview}${preview.length >= 50 ? '\u2026' : ''}`);
       }
       prevDone = d.done;
     }
+
     if (d.cs && d.errors > prevErrors) {
       d.cs.forEach((s, i) => {
         if (s && s.startsWith('error:') && !loggedErrors.has(i)) {
           loggedErrors.add(i);
           const msg = s.substring(6);
           const preview = included[i] ? included[i].text.substring(0, 30) : '';
-          addLog('err', `\u2718 Par\u00E1grafo ${i + 1} (${preview}...): ${msg}`);
+          addLog('err', `\u2718 Par\u00e1grafo ${i + 1} (${preview}...): ${msg}`);
         }
       });
       prevErrors = d.errors;
     }
 
-    // Log chapter completions
     if (d.cs) {
       chapterProgress.forEach(cp => {
         if (cp.logged || cp.indices.length === 0) return;
         const chDone = cp.indices.filter(i => d.cs[i] === 'done').length;
         if (chDone === cp.indices.length) {
-          addLog('ok', `\u2605 Cap\u00EDtulo completo: ${cp.name}`);
+          addLog('ok', `\u2605 Cap\u00edtulo completo: ${cp.name}`);
           cp.logged = true;
         }
       });
@@ -739,12 +736,12 @@ function watchProgress(bookId) {
     updateChunkHighlights(d.cs);
 
     if (d.status === 'ready' || d.status === 'error') {
-      es.close();
+      clearInterval(pollTimer);
       const totalTime = Math.round((Date.now() - startTime) / 1000);
       if (d.status === 'ready') {
-        addLog('ok', `\u2714 Conclu\u00EDdo em ${totalTime}s!`);
+        addLog('ok', `\u2714 Conclu\u00eddo em ${totalTime}s!`);
       } else {
-        addLog('err', `Geração encerrada com erros (${totalTime}s)`);
+        addLog('err', `Gera\u00e7\u00e3o encerrada com erros (${totalTime}s)`);
       }
       document.getElementById('logPulse').style.animation = 'none';
       document.getElementById('logPulse').style.background = d.status === 'ready' ? 'var(--green)' : 'var(--red)';
@@ -754,13 +751,21 @@ function watchProgress(bookId) {
         if (confirm('Audiobook gerado! Abrir no player?')) goPlayer(bookId);
       }
     }
-  };
-  es.onerror = () => {
-    es.close();
-    addLog('err', 'Conexão perdida com o servidor');
-    document.getElementById('btnGenerate').disabled = false;
-    document.getElementById('btnGenerate').textContent = 'Gerar Audiobook';
-  };
+  }
+
+  // Use polling instead of SSE (more reliable behind reverse proxies)
+  addLog('info', 'Monitorando progresso...');
+  const pollTimer = setInterval(async () => {
+    try {
+      const url = API + `/api/books/${bookId}/status${AUTH ? '?token=' + encodeURIComponent(AUTH) : ''}`;
+      const resp = await fetch(url);
+      if (!resp.ok) { addLog('warn', `Polling: HTTP ${resp.status}`); return; }
+      const d = await resp.json();
+      handleData(d);
+    } catch (err) {
+      addLog('warn', 'Polling: ' + (err.message || 'erro de rede'));
+    }
+  }, 2000);
 }
 
 // ─── PLAYER ───────────────────────────────────────
