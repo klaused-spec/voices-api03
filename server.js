@@ -226,6 +226,24 @@ const server = http.createServer(async (req, res) => {
         return json(res, 202, { status: 'generating' });
       }
 
+      // Progress (polling — more reliable than SSE behind proxies)
+      if (req.method === 'GET' && sub === '/status') {
+        const manifest = books.get(id);
+        if (!manifest) return json(res, 404, { error: 'Not found' });
+        const progress = activeJobs.get(id) || {
+          done: manifest.generatedChunks,
+          total: manifest.totalChunks,
+          errors: 0,
+          chunkStatus: null,
+        };
+        const cs = progress.chunkStatus ? manifest.chunks.map(c => {
+          const s = progress.chunkStatus[c.id];
+          if (!s) return c.generated ? 'done' : 'pending';
+          return s;
+        }) : manifest.chunks.map(c => c.generated ? 'done' : 'pending');
+        return json(res, 200, { done: progress.done, total: progress.total, errors: progress.errors, status: manifest.status, cs });
+      }
+
       // Progress (SSE)
       if (req.method === 'GET' && sub === '/progress') {
         res.writeHead(200, {

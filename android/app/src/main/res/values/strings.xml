@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Audiobook Studio</string>
-    <string name="server_url">https://api03.meulavoro.com.br/#/player</string>
-</resources>

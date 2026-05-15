@@ -3,3 +3,4 @@ node_modules/
 books/
 *.log
 .DS_Store
+android/
