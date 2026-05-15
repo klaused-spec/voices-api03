@@ -215,6 +215,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
   </div>
 
   <div class="gen-bar" id="genBar" style="display:none">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+      <select id="appendToBook" style="flex:1;min-width:200px;padding:6px 10px;border-radius:6px;border:1px solid #333;background:#111;color:#ccc;font-size:13px">
+        <option value="">Novo livro</option>
+      </select>
+      <button class="btn-gen" style="font-size:12px;padding:6px 14px" onclick="loadAppendOptions()">↻</button>
+    </div>
     <button class="btn-gen" id="btnGenerate" onclick="handleGenerate()">Gerar Audiobook</button>
     <div class="progress-box" id="progressBox" style="display:none">
       <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
@@ -453,6 +459,7 @@ async function handleFile(file) {
 function renderChunks() {
   document.getElementById('chunksSection').style.display = '';
   document.getElementById('genBar').style.display = '';
+  loadAppendOptions();
   const included = chunks.filter(c => !c.excluded).length;
   document.getElementById('chunksCount').textContent = `${included} incluídos de ${chunks.length} total`;
 
@@ -599,6 +606,20 @@ function detectChapters() {
 }
 
 
+async function loadAppendOptions() {
+  const sel = document.getElementById('appendToBook');
+  sel.innerHTML = '<option value="">Novo livro</option>';
+  try {
+    const data = await (await api('GET', '/api/books')).json();
+    (data.books || []).forEach(b => {
+      const label = b.title.length > 50 ? b.title.substring(0, 50) + '…' : b.title;
+      const status = b.status === 'ready' ? '✓' : b.status === 'error' ? '✗' : '…';
+      sel.insertAdjacentHTML('beforeend',
+        `<option value="${b.id}">${status} ${esc(label)} (${b.generatedChunks}/${b.totalChunks})</option>`);
+    });
+  } catch {}
+}
+
 async function handleGenerate() {
   const title = document.getElementById('bookTitle').value.trim();
   if (!title) return alert('Preencha o título do livro');
@@ -622,21 +643,33 @@ async function handleGenerate() {
   document.getElementById('progressLabel').textContent = 'Preparando...';
 
   try {
-    // Check if a book with same title already exists (resume instead of creating new)
-    addLog('info', 'Verificando livros existentes...');
-    const listResp = await (await api('GET', '/api/books')).json();
-    const existing = (listResp.books || []).find(b => b.title === title && b.status !== 'ready');
+    const appendTo = document.getElementById('appendToBook').value;
     let bookId;
-    if (existing) {
-      bookId = existing.id;
-      addLog('info', `Retomando livro existente: ${bookId} (${existing.generatedChunks}/${existing.totalChunks} já feitos)`);
-    } else {
-      addLog('info', 'Enviando parágrafos ao servidor...');
-      const book = await (await api('POST', '/api/books', {
-        title, voice, model, chunks: included.map(c => c.text)
+
+    if (appendTo) {
+      // Append new chunks to existing book
+      addLog('info', 'Adicionando parágrafos ao livro existente...');
+      const appendResp = await (await api('POST', `/api/books/${appendTo}/append`, {
+        chunks: included.map(c => c.text)
       })).json();
-      bookId = book.id;
-      addLog('ok', `Livro criado: ${bookId}`);
+      bookId = appendTo;
+      addLog('ok', `Adicionados ${appendResp.added} parágrafos (total: ${appendResp.totalChunks})`);
+    } else {
+      // Check if a book with same title already exists (resume)
+      addLog('info', 'Verificando livros existentes...');
+      const listResp = await (await api('GET', '/api/books')).json();
+      const existing = (listResp.books || []).find(b => b.title === title && b.status !== 'ready');
+      if (existing) {
+        bookId = existing.id;
+        addLog('info', `Retomando livro existente: ${bookId} (${existing.generatedChunks}/${existing.totalChunks} já feitos)`);
+      } else {
+        addLog('info', 'Enviando parágrafos ao servidor...');
+        const book = await (await api('POST', '/api/books', {
+          title, voice, model, chunks: included.map(c => c.text)
+        })).json();
+        bookId = book.id;
+        addLog('ok', `Livro criado: ${bookId}`);
+      }
     }
 
     addLog('info', 'Solicitando geração ao servidor...');

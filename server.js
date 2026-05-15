@@ -231,6 +231,28 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true });
       }
 
+      // Append chunks to existing book
+      if (req.method === 'POST' && sub === '/append') {
+        const manifest = books.get(id);
+        if (!manifest) return json(res, 404, { error: 'Book not found' });
+        if (activeJobs.has(id)) return json(res, 409, { error: 'Book is generating, wait for it to finish' });
+        const body = await parseBody(req);
+        const newChunks = body.chunks;
+        if (!Array.isArray(newChunks) || newChunks.length === 0) return json(res, 400, { error: 'No chunks provided' });
+        const startId = manifest.chunks.length > 0 ? Math.max(...manifest.chunks.map(c => c.id)) + 1 : 1;
+        const appended = newChunks.map((text, i) => ({
+          id: startId + i,
+          text,
+          audioFile: String(startId + i).padStart(4, '0') + '.mp3',
+          generated: false,
+        }));
+        manifest.chunks.push(...appended);
+        manifest.totalChunks = manifest.chunks.length;
+        if (manifest.status === 'ready') manifest.status = 'pending';
+        books.update(id, { chunks: manifest.chunks, totalChunks: manifest.totalChunks, status: manifest.status });
+        return json(res, 200, { ok: true, added: appended.length, totalChunks: manifest.totalChunks });
+      }
+
       // Generate
       if (req.method === 'POST' && sub === '/generate') {
         const manifest = books.get(id);
