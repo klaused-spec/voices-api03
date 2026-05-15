@@ -78,7 +78,7 @@ async function generateBook(bookId) {
         chunkStatus[chunkId] = 'done';
         progress.done++;
       } catch (err) {
-        chunkStatus[chunkId] = 'error';
+        chunkStatus[chunkId] = 'error:' + (err.message || String(err)).substring(0, 100);
         progress.errors++;
         errors++;
         console.error(`[gen] book=${bookId} chunk=${chunkId} err: ${err.message || err}`);
@@ -240,7 +240,11 @@ const server = http.createServer(async (req, res) => {
             errors: 0,
             chunkStatus: null,
           };
-          const cs = progress.chunkStatus ? manifest.chunks.map(c => progress.chunkStatus[c.id] || (c.generated ? 'done' : 'pending')) : manifest.chunks.map(c => c.generated ? 'done' : 'pending');
+          const cs = progress.chunkStatus ? manifest.chunks.map(c => {
+            const s = progress.chunkStatus[c.id];
+            if (!s) return c.generated ? 'done' : 'pending';
+            return s;
+          }) : manifest.chunks.map(c => c.generated ? 'done' : 'pending');
           res.write(`data: ${JSON.stringify({ done: progress.done, total: progress.total, errors: progress.errors, status: manifest.status, cs })}\n\n`);
           if (manifest.status === 'ready' || manifest.status === 'error') {
             clearInterval(interval);

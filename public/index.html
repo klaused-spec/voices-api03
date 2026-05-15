@@ -651,6 +651,7 @@ function watchProgress(bookId) {
   const included = chunks.filter(c => !c.excluded);
   let prevDone = 0;
   let prevErrors = 0;
+  const loggedErrors = new Set();
   const startTime = Date.now();
 
   const chapterProgress = [];
@@ -682,7 +683,7 @@ function watchProgress(bookId) {
         el.style.borderLeft = '3px solid var(--yellow)';
         el.style.paddingLeft = '6px';
         el.style.background = 'rgba(234,179,8,.06)';
-      } else if (st === 'error') {
+      } else if (st.startsWith('error')) {
         el.style.borderLeft = '3px solid var(--red)';
         el.style.paddingLeft = '6px';
         el.style.background = 'rgba(239,68,68,.06)';
@@ -706,8 +707,15 @@ function watchProgress(bookId) {
       }
       prevDone = d.done;
     }
-    if (d.errors > prevErrors) {
-      addLog('err', `\u2718 Erro no par\u00E1grafo ${d.done + d.errors}`);
+    if (d.cs && d.errors > prevErrors) {
+      d.cs.forEach((s, i) => {
+        if (s && s.startsWith('error:') && !loggedErrors.has(i)) {
+          loggedErrors.add(i);
+          const msg = s.substring(6);
+          const preview = included[i] ? included[i].text.substring(0, 30) : '';
+          addLog('err', `\u2718 Par\u00E1grafo ${i + 1} (${preview}...): ${msg}`);
+        }
+      });
       prevErrors = d.errors;
     }
 
