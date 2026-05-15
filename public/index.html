@@ -123,6 +123,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 <nav class="nav">
   <button class="nav-back" id="navBack" style="display:none" onclick="goBack()">&#8592;</button>
   <h1>Audiobook Studio</h1>
+  <button id="btnLogout" style="margin-left:auto;background:none;color:var(--text2);font-size:12px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;display:none" onclick="doLogout()">Sair</button>
 </nav>
 
 <!-- LOGIN PAGE -->
@@ -244,6 +245,11 @@ async function doLogin() {
   } catch {
     document.getElementById('loginError').style.display = '';
   }
+}
+
+function doLogout() {
+  localStorage.removeItem('ab_token');
+  location.reload();
 }
 
 document.getElementById('tokenInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
@@ -769,6 +775,7 @@ function fmtTime(s) {
     return;
   }
 
+  document.getElementById('btnLogout').style.display = '';
   await loadVoices();
 
   const h = window.location.hash;
