@@ -589,18 +589,26 @@ async function handleGenerate() {
   const model = document.getElementById('modelSelect').value;
 
   document.getElementById('btnGenerate').disabled = true;
+  document.getElementById('btnGenerate').textContent = 'Criando livro...';
+  document.getElementById('genBar').style.display = '';
   document.getElementById('progressBox').style.display = '';
+  document.getElementById('progressLabel').textContent = 'Preparando...';
+  document.getElementById('progressFill').style.width = '0%';
 
   try {
+    document.getElementById('progressLabel').textContent = 'Enviando parágrafos ao servidor...';
     const book = await (await api('POST', '/api/books', {
       title, voice, model, chunks: included.map(c => c.text)
     })).json();
 
+    document.getElementById('progressLabel').textContent = 'Iniciando geração...';
     await api('POST', `/api/books/${book.id}/generate`);
+    document.getElementById('btnGenerate').textContent = 'Gerando...';
     watchProgress(book.id);
   } catch (e) {
     alert('Erro: ' + e.message);
     document.getElementById('btnGenerate').disabled = false;
+    document.getElementById('btnGenerate').textContent = 'Gerar Audiobook';
   }
 }
 
@@ -696,12 +704,13 @@ function watchProgress(bookId) {
     if (d.status === 'ready' || d.status === 'error') {
       es.close();
       document.getElementById('btnGenerate').disabled = false;
+      document.getElementById('btnGenerate').textContent = 'Gerar Audiobook';
       if (d.status === 'ready') {
         if (confirm('Audiobook gerado! Abrir no player?')) goPlayer(bookId);
       }
     }
   };
-  es.onerror = () => { es.close(); document.getElementById('btnGenerate').disabled = false; };
+  es.onerror = () => { es.close(); document.getElementById('btnGenerate').disabled = false; document.getElementById('btnGenerate').textContent = 'Gerar Audiobook'; };
 }
 
 // ─── PLAYER ───────────────────────────────────────
