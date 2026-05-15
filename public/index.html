@@ -74,6 +74,17 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .ch-nav .ch-toggle{flex-shrink:0;width:18px;height:18px;border-radius:4px;border:1px solid var(--border);background:var(--green);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
 .ch-nav.excluded .ch-toggle{background:var(--red)}
 .ch-nav .ch-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gen-log{width:280px;min-width:200px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;font-family:'Courier New',monospace;font-size:11px;line-height:1.5;padding:0;display:none;flex-direction:column}
+.gen-log-header{padding:8px 12px;font-weight:600;font-size:12px;color:var(--text);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-family:inherit}
+.gen-log-header .pulse{width:8px;height:8px;border-radius:50%;background:var(--yellow);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.gen-log-body{flex:1;overflow-y:auto;padding:6px 0}
+.log-entry{padding:2px 12px;color:var(--text2);word-break:break-word}
+.log-entry.ok{color:var(--green)}
+.log-entry.err{color:var(--red)}
+.log-entry.warn{color:var(--yellow)}
+.log-entry.info{color:var(--accent)}
+.log-entry .log-ts{color:var(--text2);opacity:.5;margin-right:6px}
 .chunk-list{flex:1;overflow-y:auto;padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;font-size:15px;line-height:1.8;color:var(--text)}
 .chunk-item{padding:2px 4px;border-radius:4px;cursor:pointer;transition:all .2s;display:inline;position:relative}
 .chunk-item:hover{background:rgba(124,58,237,.12)}
@@ -195,6 +206,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
     <div class="editor-layout">
       <div class="chunk-list" id="chunkList"></div>
       <div class="chapter-sidebar" id="chapterSidebar"></div>
+      <div class="gen-log" id="genLog">
+        <div class="gen-log-header"><span class="pulse" id="logPulse"></span> Log de Geração</div>
+        <div class="gen-log-body" id="genLogBody"></div>
+      </div>
     </div>
 
   </div>
@@ -589,35 +604,55 @@ async function handleGenerate() {
   const model = document.getElementById('modelSelect').value;
 
   document.getElementById('btnGenerate').disabled = true;
-  document.getElementById('btnGenerate').textContent = 'Criando livro...';
+  document.getElementById('btnGenerate').textContent = 'Gerando...';
   document.getElementById('genBar').style.display = '';
   document.getElementById('progressBox').style.display = '';
-  document.getElementById('progressLabel').textContent = 'Preparando...';
   document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('chapterSidebar').style.display = 'none';
+  const log = document.getElementById('genLog');
+  log.style.display = 'flex';
+  clearLog();
+  addLog('info', `Iniciando: ${included.length} parágrafos, voz ${voice}, modelo ${model}`);
+  addLog('info', `Título: ${title}`);
+  document.getElementById('progressLabel').textContent = 'Preparando...';
 
   try {
-    document.getElementById('progressLabel').textContent = 'Enviando parágrafos ao servidor...';
+    addLog('info', 'Enviando parágrafos ao servidor...');
     const book = await (await api('POST', '/api/books', {
       title, voice, model, chunks: included.map(c => c.text)
     })).json();
+    addLog('ok', `Livro criado: ${book.id}`);
 
-    document.getElementById('progressLabel').textContent = 'Iniciando geração...';
+    addLog('info', 'Solicitando geração ao servidor...');
     await api('POST', `/api/books/${book.id}/generate`);
-    document.getElementById('btnGenerate').textContent = 'Gerando...';
+    addLog('ok', 'Servidor iniciou a geração');
     watchProgress(book.id);
   } catch (e) {
+    addLog('err', 'ERRO: ' + e.message);
     alert('Erro: ' + e.message);
     document.getElementById('btnGenerate').disabled = false;
     document.getElementById('btnGenerate').textContent = 'Gerar Audiobook';
   }
 }
 
+function clearLog() {
+  document.getElementById('genLogBody').innerHTML = '';
+}
+function addLog(cls, msg) {
+  const body = document.getElementById('genLogBody');
+  const ts = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  body.insertAdjacentHTML('beforeend', `<div class="log-entry ${cls}"><span class="log-ts">${ts}</span>${esc(msg)}</div>`);
+  body.scrollTop = body.scrollHeight;
+}
+
 function watchProgress(bookId) {
-  // Build map of which chunks are included (by their original index)
   const includedIndices = [];
   chunks.forEach((c, i) => { if (!c.excluded) includedIndices.push(i); });
+  const included = chunks.filter(c => !c.excluded);
+  let prevDone = 0;
+  let prevErrors = 0;
+  const startTime = Date.now();
 
-  // Map chapter -> range of included indices
   const chapterProgress = [];
   if (chapters.length > 0) {
     chapters.forEach((ch, ci) => {
@@ -625,15 +660,12 @@ function watchProgress(bookId) {
       for (let i = ch.startIdx; i <= ch.endIdx; i++) {
         if (!chunks[i].excluded) slice.push(includedIndices.indexOf(i));
       }
-      chapterProgress.push({ ci, name: ch.name, indices: slice });
+      chapterProgress.push({ ci, name: ch.name, indices: slice, logged: false });
     });
   }
 
-  function updateFromCS(cs) {
-    // cs = array of statuses for included-only chunks: 'pending'|'generating'|'done'|'error'
+  function updateChunkHighlights(cs) {
     if (!cs) return;
-
-    // Update each paragraph in the text
     const items = document.querySelectorAll('#chunkList .chunk-item');
     items.forEach(el => {
       const idx = parseInt(el.dataset.idx);
@@ -656,53 +688,53 @@ function watchProgress(bookId) {
         el.style.background = 'rgba(239,68,68,.06)';
       }
     });
-
-    // Update chapter badges in sidebar
-    chapterProgress.forEach(cp => {
-      const btn = document.querySelector('#chapterSidebar .ch-nav[data-ch="' + cp.ci + '"]');
-      if (!btn) return;
-      if (cp.indices.length === 0) return;
-      let badge = btn.querySelector('.ch-progress');
-      if (!badge) {
-        badge = document.createElement('span');
-        badge.className = 'ch-progress';
-        badge.style.cssText = 'margin-left:auto;font-size:10px;flex-shrink:0;padding:1px 5px;border-radius:6px;';
-        btn.appendChild(badge);
-      }
-      const chDone = cp.indices.filter(i => cs[i] === 'done').length;
-      const chErr = cp.indices.filter(i => cs[i] === 'error').length;
-      const chGen = cp.indices.filter(i => cs[i] === 'generating').length;
-      if (chDone === cp.indices.length) {
-        badge.textContent = '\u2713';
-        badge.style.color = 'var(--green)';
-        badge.style.background = 'rgba(34,197,94,.15)';
-      } else if (chErr > 0) {
-        badge.textContent = chDone + '/' + cp.indices.length + ' \u26A0' + chErr;
-        badge.style.color = 'var(--red)';
-        badge.style.background = 'rgba(239,68,68,.15)';
-      } else if (chGen > 0 || chDone > 0) {
-        badge.textContent = chDone + '/' + cp.indices.length;
-        badge.style.color = 'var(--yellow)';
-        badge.style.background = 'rgba(234,179,8,.15)';
-      } else {
-        badge.textContent = '0/' + cp.indices.length;
-        badge.style.color = 'var(--text2)';
-        badge.style.background = 'var(--surface2)';
-      }
-    });
   }
 
   const es = new EventSource(API + `/api/books/${bookId}/progress`);
   es.onmessage = (e) => {
     const d = JSON.parse(e.data);
     const pct = d.total > 0 ? Math.round(d.done / d.total * 100) : 0;
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
     document.getElementById('progressFill').style.width = pct + '%';
-    document.getElementById('progressLabel').textContent = `${d.done}/${d.total} par\u00E1grafos (${pct}%)${d.errors > 0 ? ' \u2014 ' + d.errors + ' erros' : ''}`;
+    document.getElementById('progressLabel').textContent = `${d.done}/${d.total} (${pct}%) \u2014 ${elapsed}s`;
 
-    updateFromCS(d.cs);
+    // Log new completions
+    if (d.done > prevDone) {
+      for (let i = prevDone; i < d.done; i++) {
+        const preview = included[i] ? included[i].text.substring(0, 50) : '';
+        addLog('ok', `\u2713 Par\u00E1grafo ${i + 1}: ${preview}${preview.length >= 50 ? '\u2026' : ''}`);
+      }
+      prevDone = d.done;
+    }
+    if (d.errors > prevErrors) {
+      addLog('err', `\u2718 Erro no par\u00E1grafo ${d.done + d.errors}`);
+      prevErrors = d.errors;
+    }
+
+    // Log chapter completions
+    if (d.cs) {
+      chapterProgress.forEach(cp => {
+        if (cp.logged || cp.indices.length === 0) return;
+        const chDone = cp.indices.filter(i => d.cs[i] === 'done').length;
+        if (chDone === cp.indices.length) {
+          addLog('ok', `\u2605 Cap\u00EDtulo completo: ${cp.name}`);
+          cp.logged = true;
+        }
+      });
+    }
+
+    updateChunkHighlights(d.cs);
 
     if (d.status === 'ready' || d.status === 'error') {
       es.close();
+      const totalTime = Math.round((Date.now() - startTime) / 1000);
+      if (d.status === 'ready') {
+        addLog('ok', `\u2714 Conclu\u00EDdo em ${totalTime}s!`);
+      } else {
+        addLog('err', `Geração encerrada com erros (${totalTime}s)`);
+      }
+      document.getElementById('logPulse').style.animation = 'none';
+      document.getElementById('logPulse').style.background = d.status === 'ready' ? 'var(--green)' : 'var(--red)';
       document.getElementById('btnGenerate').disabled = false;
       document.getElementById('btnGenerate').textContent = 'Gerar Audiobook';
       if (d.status === 'ready') {
@@ -710,7 +742,12 @@ function watchProgress(bookId) {
       }
     }
   };
-  es.onerror = () => { es.close(); document.getElementById('btnGenerate').disabled = false; document.getElementById('btnGenerate').textContent = 'Gerar Audiobook'; };
+  es.onerror = () => {
+    es.close();
+    addLog('err', 'Conexão perdida com o servidor');
+    document.getElementById('btnGenerate').disabled = false;
+    document.getElementById('btnGenerate').textContent = 'Gerar Audiobook';
+  };
 }
 
 // ─── PLAYER ───────────────────────────────────────
