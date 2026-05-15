@@ -605,35 +605,80 @@ async function handleGenerate() {
 }
 
 function watchProgress(bookId) {
-  const sidebar = document.getElementById('chapterSidebar');
+  // Build a map: for each included chunk, what is its index in the included-only list
   const included = chunks.filter(c => !c.excluded);
-  let lastDone = 0;
 
-  // Show progress list in sidebar
-  function updateSidebar(done, total, errors) {
-    let html = '<div style="padding:6px 10px;font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Progresso</div>';
-    included.forEach((c, i) => {
-      let icon, cls;
-      if (i < done) { icon = '✓'; cls = 'color:var(--green)'; }
-      else if (i === done) { icon = '⟳'; cls = 'color:var(--yellow)'; }
-      else { icon = '·'; cls = 'color:var(--text2);opacity:.4'; }
-      const preview = c.text.substring(0, 40) + (c.text.length > 40 ? '…' : '');
-      html += '<div style="padding:3px 10px;font-size:11px;line-height:1.4;display:flex;gap:6px;align-items:flex-start;' + cls + '"><span style="flex-shrink:0">' + icon + '</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (i+1) + '. ' + esc(preview) + '</span></div>';
+  // Map chapter index -> { start, end } in included-only indices
+  const chapterProgress = [];
+  if (chapters.length > 0) {
+    let inclIdx = 0;
+    chapters.forEach((ch, ci) => {
+      const slice = chunks.slice(ch.startIdx, ch.endIdx + 1);
+      const inclCount = slice.filter(c => !c.excluded).length;
+      chapterProgress.push({ ci, name: ch.name, start: inclIdx, count: inclCount });
+      inclIdx += inclCount;
     });
-    if (errors > 0) html += '<div style="padding:6px 10px;font-size:11px;color:var(--red)">⚠ ' + errors + ' erro(s)</div>';
-    sidebar.innerHTML = html;
   }
 
-  updateSidebar(0, included.length, 0);
+  function updateSidebarProgress(done) {
+    if (chapters.length === 0) return;
+    chapterProgress.forEach(cp => {
+      const btn = document.querySelector(`#chapterSidebar .ch-nav[data-ch="${cp.ci}"]`);
+      if (!btn) return;
+      const badge = btn.querySelector('.ch-progress');
+      const chDone = Math.max(0, Math.min(cp.count, done - cp.start));
+      if (cp.count === 0) return;
+      if (!badge) {
+        const b = document.createElement('span');
+        b.className = 'ch-progress';
+        b.style.cssText = 'margin-left:auto;font-size:10px;flex-shrink:0;padding:1px 5px;border-radius:6px;';
+        btn.appendChild(b);
+      }
+      const el = btn.querySelector('.ch-progress');
+      if (chDone === cp.count) {
+        el.textContent = '\u2713';
+        el.style.color = 'var(--green)';
+        el.style.background = 'rgba(34,197,94,.15)';
+      } else if (chDone > 0) {
+        el.textContent = chDone + '/' + cp.count;
+        el.style.color = 'var(--yellow)';
+        el.style.background = 'rgba(234,179,8,.15)';
+      } else {
+        el.textContent = '0/' + cp.count;
+        el.style.color = 'var(--text2)';
+        el.style.background = 'var(--surface2)';
+      }
+    });
+  }
+
+  // Also highlight individual paragraphs in the text area
+  function updateChunkHighlights(done) {
+    const items = document.querySelectorAll('#chunkList .chunk-item:not(.excluded)');
+    items.forEach((el, i) => {
+      el.style.removeProperty('border-left');
+      el.style.removeProperty('padding-left');
+      if (i < done) {
+        el.style.borderLeft = '3px solid var(--green)';
+        el.style.paddingLeft = '6px';
+      } else if (i === done) {
+        el.style.borderLeft = '3px solid var(--yellow)';
+        el.style.paddingLeft = '6px';
+      }
+    });
+  }
+
+  updateSidebarProgress(0);
+  updateChunkHighlights(0);
 
   const es = new EventSource(API + `/api/books/${bookId}/progress`);
   es.onmessage = (e) => {
     const d = JSON.parse(e.data);
     const pct = d.total > 0 ? Math.round(d.done / d.total * 100) : 0;
     document.getElementById('progressFill').style.width = pct + '%';
-    document.getElementById('progressLabel').textContent = `${d.done}/${d.total} parágrafos (${pct}%)${d.errors > 0 ? ' — ' + d.errors + ' erros' : ''}`;
+    document.getElementById('progressLabel').textContent = `${d.done}/${d.total} par\u00E1grafos (${pct}%)${d.errors > 0 ? ' \u2014 ' + d.errors + ' erros' : ''}`;
 
-    updateSidebar(d.done, d.total, d.errors);
+    updateSidebarProgress(d.done);
+    updateChunkHighlights(d.done);
 
     if (d.status === 'ready' || d.status === 'error') {
       es.close();
