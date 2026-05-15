@@ -78,21 +78,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .chunk-para-break{display:block;height:12px}
 
 /* CHAPTERS */
-.chapter-group{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px}
-.chapter-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);cursor:pointer;user-select:none;transition:background .15s}
-.chapter-hdr:hover{background:var(--surface2)}
-.chapter-hdr .arrow{font-size:12px;color:var(--text2);transition:transform .2s;min-width:14px}
-.chapter-hdr.open .arrow{transform:rotate(90deg)}
-.chapter-hdr .ch-name{font-size:14px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chapter-hdr .ch-count{font-size:11px;color:var(--text2);white-space:nowrap;background:var(--surface2);padding:2px 8px;border-radius:10px}
-.chapter-hdr .ch-btns{display:flex;gap:4px}
-.chapter-hdr .ch-btns button{font-size:11px;padding:3px 8px;border-radius:4px;background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
-.chapter-hdr .ch-btns button:hover{background:var(--border);color:var(--text)}
-.chapter-hdr.auto-excluded{opacity:.5}
-.chapter-hdr.auto-excluded .ch-name{text-decoration:line-through}
-.chapter-body{display:none;padding:12px 20px}
-.chapter-group.open .chapter-body{display:block;font-size:15px;line-height:1.8}
-.chapter-group.open{border-color:rgba(124,58,237,.3)}
+.chapter-title{display:block;font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin:24px 0 8px 0;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;transition:opacity .2s}
+.chapter-title:first-child{margin-top:0}
+.chapter-title:hover{opacity:.7}
+.chapter-title.auto-excluded{opacity:.35;text-decoration:line-through}
+.chapter-title .ch-count{font-size:10px;color:var(--text2);font-weight:400;margin-left:8px;letter-spacing:0;text-transform:none}
 
 .gen-bar{position:sticky;bottom:0;z-index:50;margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--bg);padding:12px 0;border-top:1px solid var(--border)}
 .btn-gen{background:var(--accent);color:#fff;padding:12px 28px;font-weight:700;font-size:15px}
@@ -436,24 +426,11 @@ function renderChunks() {
     const chunkSlice = chunks.slice(ch.startIdx, ch.endIdx + 1);
     const chIncluded = chunkSlice.filter(c => !c.excluded).length;
     const chTotal = chunkSlice.length;
-    const isOpen = !ch.autoExcluded && (ch._open !== false);
-    const openClass = isOpen ? 'open' : '';
     const autoClass = ch.autoExcluded ? 'auto-excluded' : '';
 
     const items = chunkSlice.map((c, j) => renderChunkItem(c, ch.startIdx + j)).join('');
 
-    return `<div class="chapter-group ${openClass}" data-ch="${ci}">
-      <div class="chapter-hdr ${openClass} ${autoClass}" onclick="toggleChapter(${ci})">
-        <span class="arrow">&#9654;</span>
-        <span class="ch-name">${esc(ch.name)}</span>
-        <span class="ch-count">${chIncluded}/${chTotal}</span>
-        <div class="ch-btns">
-          <button onclick="event.stopPropagation(); chapterToggleAll(${ci}, true)">Incluir</button>
-          <button onclick="event.stopPropagation(); chapterToggleAll(${ci}, false)">Excluir</button>
-        </div>
-      </div>
-      <div class="chapter-body">${items}</div>
-    </div>`;
+    return `<span class="chapter-title ${autoClass}" onclick="chapterToggleAll(${ci}, ${ch.autoExcluded})" title="Clique para ${ch.autoExcluded ? 'incluir' : 'excluir'} todo o capítulo">${esc(ch.name)}<span class="ch-count">${chIncluded}/${chTotal}</span></span>${items}`;
   }).join('');
 }
 
@@ -462,12 +439,7 @@ function renderChunkItem(c, i) {
 }
 
 function toggleChapter(ci) {
-  const ch = chapters[ci];
-  const group = document.querySelector(`.chapter-group[data-ch="${ci}"]`);
-  if (!group) return;
-  const isOpen = group.classList.toggle('open');
-  group.querySelector('.chapter-hdr').classList.toggle('open', isOpen);
-  ch._open = isOpen;
+  chapterToggleAll(ci, chapters[ci].autoExcluded);
 }
 
 function chapterToggleAll(ci, include) {
