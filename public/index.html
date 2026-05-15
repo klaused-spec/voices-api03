@@ -23,7 +23,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .nav-back:hover{color:var(--text)}
 
 /* PAGES */
-.page{display:none;padding:16px;max-width:900px;margin:0 auto}
+.page{display:none;padding:16px 16px 80px;max-width:900px;margin:0 auto}
 .page.active{display:block}
 
 /* LIBRARY */
@@ -84,14 +84,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .chapter-title.auto-excluded{opacity:.35;text-decoration:line-through}
 .chapter-title .ch-count{font-size:10px;color:var(--text2);font-weight:400;margin-left:8px;letter-spacing:0;text-transform:none}
 
-.gen-bar{position:sticky;bottom:0;z-index:50;margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--bg);padding:12px 0;border-top:1px solid var(--border)}
+.gen-bar{position:fixed;bottom:0;left:0;right:0;z-index:200;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;background:var(--surface);padding:14px 20px;border-top:1px solid var(--border);box-shadow:0 -4px 20px rgba(0,0,0,.3)}
 .btn-gen{background:var(--accent);color:#fff;padding:12px 28px;font-weight:700;font-size:15px}
 .btn-gen:hover{background:var(--accent2)}
 .btn-gen:disabled{opacity:.5;cursor:not-allowed}
-.progress-box{flex:1;min-width:200px}
+.progress-box{flex:1;min-width:200px;max-width:500px}
 .progress-track{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden}
 .progress-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .3s}
-.progress-label{font-size:12px;color:var(--text2);margin-top:4px}
+.progress-label{font-size:13px;color:var(--text);margin-top:4px;font-weight:500}
 
 /* PLAYER */
 .player-wrap{display:flex;flex-direction:column;height:calc(100vh - 60px)}
@@ -137,7 +137,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 </div>
 
 <!-- LIBRARY PAGE -->
-<div class="page active" id="pageLibrary">
+<div class="page" id="pageLibrary">
   <div class="lib-header">
     <div><h2 style="font-size:20px">Biblioteca</h2></div>
     <button class="btn-new" onclick="goEditor('new')">+ Novo Livro</button>
