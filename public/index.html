@@ -197,12 +197,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
       <div class="chunk-list" id="chunkList"></div>
     </div>
 
-    <div class="gen-bar">
-      <button class="btn-gen" id="btnGenerate" onclick="handleGenerate()">Gerar Audiobook</button>
-      <div class="progress-box" id="progressBox" style="display:none">
-        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-        <div class="progress-label" id="progressLabel"></div>
-      </div>
+  </div>
+
+  <div class="gen-bar" id="genBar" style="display:none">
+    <button class="btn-gen" id="btnGenerate" onclick="handleGenerate()">Gerar Audiobook</button>
+    <div class="progress-box" id="progressBox" style="display:none">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-label" id="progressLabel"></div>
     </div>
   </div>
 </div>
@@ -384,6 +385,7 @@ function resetEditor() {
   document.getElementById('chunksSection').style.display = 'none';
   document.getElementById('dropZone').style.display = '';
   document.getElementById('progressBox').style.display = 'none';
+  document.getElementById('genBar').style.display = 'none';
   document.getElementById('dropLabel').textContent = 'Arraste um PDF aqui ou clique para selecionar';
 }
 
@@ -430,6 +432,7 @@ async function handleFile(file) {
 
 function renderChunks() {
   document.getElementById('chunksSection').style.display = '';
+  document.getElementById('genBar').style.display = '';
   const included = chunks.filter(c => !c.excluded).length;
   document.getElementById('chunksCount').textContent = `${included} incluídos de ${chunks.length} total`;
 
@@ -602,12 +605,35 @@ async function handleGenerate() {
 }
 
 function watchProgress(bookId) {
+  const sidebar = document.getElementById('chapterSidebar');
+  const included = chunks.filter(c => !c.excluded);
+  let lastDone = 0;
+
+  // Show progress list in sidebar
+  function updateSidebar(done, total, errors) {
+    let html = '<div style="padding:6px 10px;font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Progresso</div>';
+    included.forEach((c, i) => {
+      let icon, cls;
+      if (i < done) { icon = '✓'; cls = 'color:var(--green)'; }
+      else if (i === done) { icon = '⟳'; cls = 'color:var(--yellow)'; }
+      else { icon = '·'; cls = 'color:var(--text2);opacity:.4'; }
+      const preview = c.text.substring(0, 40) + (c.text.length > 40 ? '…' : '');
+      html += '<div style="padding:3px 10px;font-size:11px;line-height:1.4;display:flex;gap:6px;align-items:flex-start;' + cls + '"><span style="flex-shrink:0">' + icon + '</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (i+1) + '. ' + esc(preview) + '</span></div>';
+    });
+    if (errors > 0) html += '<div style="padding:6px 10px;font-size:11px;color:var(--red)">⚠ ' + errors + ' erro(s)</div>';
+    sidebar.innerHTML = html;
+  }
+
+  updateSidebar(0, included.length, 0);
+
   const es = new EventSource(API + `/api/books/${bookId}/progress`);
   es.onmessage = (e) => {
     const d = JSON.parse(e.data);
     const pct = d.total > 0 ? Math.round(d.done / d.total * 100) : 0;
     document.getElementById('progressFill').style.width = pct + '%';
-    document.getElementById('progressLabel').textContent = `${d.done}/${d.total} parágrafos (${pct}%)${d.errors > 0 ? ` — ${d.errors} erros` : ''}`;
+    document.getElementById('progressLabel').textContent = `${d.done}/${d.total} parágrafos (${pct}%)${d.errors > 0 ? ' — ' + d.errors + ' erros' : ''}`;
+
+    updateSidebar(d.done, d.total, d.errors);
 
     if (d.status === 'ready' || d.status === 'error') {
       es.close();
