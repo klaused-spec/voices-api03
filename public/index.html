@@ -622,16 +622,27 @@ async function handleGenerate() {
   document.getElementById('progressLabel').textContent = 'Preparando...';
 
   try {
-    addLog('info', 'Enviando parágrafos ao servidor...');
-    const book = await (await api('POST', '/api/books', {
-      title, voice, model, chunks: included.map(c => c.text)
-    })).json();
-    addLog('ok', `Livro criado: ${book.id}`);
+    // Check if a book with same title already exists (resume instead of creating new)
+    addLog('info', 'Verificando livros existentes...');
+    const listResp = await (await api('GET', '/api/books')).json();
+    const existing = (listResp.books || []).find(b => b.title === title && b.status !== 'ready');
+    let bookId;
+    if (existing) {
+      bookId = existing.id;
+      addLog('info', `Retomando livro existente: ${bookId} (${existing.generatedChunks}/${existing.totalChunks} já feitos)`);
+    } else {
+      addLog('info', 'Enviando parágrafos ao servidor...');
+      const book = await (await api('POST', '/api/books', {
+        title, voice, model, chunks: included.map(c => c.text)
+      })).json();
+      bookId = book.id;
+      addLog('ok', `Livro criado: ${bookId}`);
+    }
 
     addLog('info', 'Solicitando geração ao servidor...');
-    await api('POST', `/api/books/${book.id}/generate`);
+    await api('POST', `/api/books/${bookId}/generate`);
     addLog('ok', 'Servidor iniciou a geração');
-    watchProgress(book.id);
+    watchProgress(bookId);
   } catch (e) {
     addLog('err', 'ERRO: ' + e.message);
     alert('Erro: ' + e.message);
