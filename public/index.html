@@ -193,8 +193,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
       <button class="btn-sm" onclick="toggleAll(false)">Excluir todos</button>
     </div>
     <div class="editor-layout">
-      <div class="chapter-sidebar" id="chapterSidebar"></div>
       <div class="chunk-list" id="chunkList"></div>
+      <div class="chapter-sidebar" id="chapterSidebar"></div>
     </div>
 
   </div>
@@ -605,70 +605,84 @@ async function handleGenerate() {
 }
 
 function watchProgress(bookId) {
-  // Build a map: for each included chunk, what is its index in the included-only list
-  const included = chunks.filter(c => !c.excluded);
+  // Build map of which chunks are included (by their original index)
+  const includedIndices = [];
+  chunks.forEach((c, i) => { if (!c.excluded) includedIndices.push(i); });
 
-  // Map chapter index -> { start, end } in included-only indices
+  // Map chapter -> range of included indices
   const chapterProgress = [];
   if (chapters.length > 0) {
-    let inclIdx = 0;
     chapters.forEach((ch, ci) => {
-      const slice = chunks.slice(ch.startIdx, ch.endIdx + 1);
-      const inclCount = slice.filter(c => !c.excluded).length;
-      chapterProgress.push({ ci, name: ch.name, start: inclIdx, count: inclCount });
-      inclIdx += inclCount;
+      const slice = [];
+      for (let i = ch.startIdx; i <= ch.endIdx; i++) {
+        if (!chunks[i].excluded) slice.push(includedIndices.indexOf(i));
+      }
+      chapterProgress.push({ ci, name: ch.name, indices: slice });
     });
   }
 
-  function updateSidebarProgress(done) {
-    if (chapters.length === 0) return;
-    chapterProgress.forEach(cp => {
-      const btn = document.querySelector(`#chapterSidebar .ch-nav[data-ch="${cp.ci}"]`);
-      if (!btn) return;
-      const badge = btn.querySelector('.ch-progress');
-      const chDone = Math.max(0, Math.min(cp.count, done - cp.start));
-      if (cp.count === 0) return;
-      if (!badge) {
-        const b = document.createElement('span');
-        b.className = 'ch-progress';
-        b.style.cssText = 'margin-left:auto;font-size:10px;flex-shrink:0;padding:1px 5px;border-radius:6px;';
-        btn.appendChild(b);
-      }
-      const el = btn.querySelector('.ch-progress');
-      if (chDone === cp.count) {
-        el.textContent = '\u2713';
-        el.style.color = 'var(--green)';
-        el.style.background = 'rgba(34,197,94,.15)';
-      } else if (chDone > 0) {
-        el.textContent = chDone + '/' + cp.count;
-        el.style.color = 'var(--yellow)';
-        el.style.background = 'rgba(234,179,8,.15)';
-      } else {
-        el.textContent = '0/' + cp.count;
-        el.style.color = 'var(--text2)';
-        el.style.background = 'var(--surface2)';
-      }
-    });
-  }
+  function updateFromCS(cs) {
+    // cs = array of statuses for included-only chunks: 'pending'|'generating'|'done'|'error'
+    if (!cs) return;
 
-  // Also highlight individual paragraphs in the text area
-  function updateChunkHighlights(done) {
-    const items = document.querySelectorAll('#chunkList .chunk-item:not(.excluded)');
-    items.forEach((el, i) => {
+    // Update each paragraph in the text
+    const items = document.querySelectorAll('#chunkList .chunk-item');
+    items.forEach(el => {
+      const idx = parseInt(el.dataset.idx);
+      const inclPos = includedIndices.indexOf(idx);
       el.style.removeProperty('border-left');
       el.style.removeProperty('padding-left');
-      if (i < done) {
+      el.style.removeProperty('background');
+      if (inclPos < 0 || !cs[inclPos]) return;
+      const st = cs[inclPos];
+      if (st === 'done') {
         el.style.borderLeft = '3px solid var(--green)';
         el.style.paddingLeft = '6px';
-      } else if (i === done) {
+      } else if (st === 'generating') {
         el.style.borderLeft = '3px solid var(--yellow)';
         el.style.paddingLeft = '6px';
+        el.style.background = 'rgba(234,179,8,.06)';
+      } else if (st === 'error') {
+        el.style.borderLeft = '3px solid var(--red)';
+        el.style.paddingLeft = '6px';
+        el.style.background = 'rgba(239,68,68,.06)';
+      }
+    });
+
+    // Update chapter badges in sidebar
+    chapterProgress.forEach(cp => {
+      const btn = document.querySelector('#chapterSidebar .ch-nav[data-ch="' + cp.ci + '"]');
+      if (!btn) return;
+      if (cp.indices.length === 0) return;
+      let badge = btn.querySelector('.ch-progress');
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'ch-progress';
+        badge.style.cssText = 'margin-left:auto;font-size:10px;flex-shrink:0;padding:1px 5px;border-radius:6px;';
+        btn.appendChild(badge);
+      }
+      const chDone = cp.indices.filter(i => cs[i] === 'done').length;
+      const chErr = cp.indices.filter(i => cs[i] === 'error').length;
+      const chGen = cp.indices.filter(i => cs[i] === 'generating').length;
+      if (chDone === cp.indices.length) {
+        badge.textContent = '\u2713';
+        badge.style.color = 'var(--green)';
+        badge.style.background = 'rgba(34,197,94,.15)';
+      } else if (chErr > 0) {
+        badge.textContent = chDone + '/' + cp.indices.length + ' \u26A0' + chErr;
+        badge.style.color = 'var(--red)';
+        badge.style.background = 'rgba(239,68,68,.15)';
+      } else if (chGen > 0 || chDone > 0) {
+        badge.textContent = chDone + '/' + cp.indices.length;
+        badge.style.color = 'var(--yellow)';
+        badge.style.background = 'rgba(234,179,8,.15)';
+      } else {
+        badge.textContent = '0/' + cp.indices.length;
+        badge.style.color = 'var(--text2)';
+        badge.style.background = 'var(--surface2)';
       }
     });
   }
-
-  updateSidebarProgress(0);
-  updateChunkHighlights(0);
 
   const es = new EventSource(API + `/api/books/${bookId}/progress`);
   es.onmessage = (e) => {
@@ -677,8 +691,7 @@ function watchProgress(bookId) {
     document.getElementById('progressFill').style.width = pct + '%';
     document.getElementById('progressLabel').textContent = `${d.done}/${d.total} par\u00E1grafos (${pct}%)${d.errors > 0 ? ' \u2014 ' + d.errors + ' erros' : ''}`;
 
-    updateSidebarProgress(d.done);
-    updateChunkHighlights(d.done);
+    updateFromCS(d.cs);
 
     if (d.status === 'ready' || d.status === 'error') {
       es.close();

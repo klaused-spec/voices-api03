@@ -57,7 +57,9 @@ async function generateBook(bookId) {
   const queue = manifest.chunks.filter(c => !c.generated).map(c => c.id);
   let errors = 0;
 
-  const progress = { done: manifest.generatedChunks, total: manifest.totalChunks, errors: 0 };
+  const chunkStatus = {};
+  manifest.chunks.forEach(c => { chunkStatus[c.id] = c.generated ? 'done' : 'pending'; });
+  const progress = { done: manifest.generatedChunks, total: manifest.totalChunks, errors: 0, chunkStatus };
   activeJobs.set(bookId, progress);
 
   async function worker() {
@@ -67,13 +69,16 @@ async function generateBook(bookId) {
       if (!chunk) continue;
 
       try {
+        chunkStatus[chunkId] = 'generating';
         const result = await tts.synthesize(chunk.text, manifest.voice, manifest.model);
         const mp3Buf = mp3.pcmToMp3(result.pcm);
         const audioFile = chunk.audioFile;
         fs.writeFileSync(books.audioPath(bookId, audioFile), mp3Buf);
         books.updateChunk(bookId, chunkId, { generated: true });
+        chunkStatus[chunkId] = 'done';
         progress.done++;
       } catch (err) {
+        chunkStatus[chunkId] = 'error';
         progress.errors++;
         errors++;
         console.error(`[gen] book=${bookId} chunk=${chunkId} err: ${err.message || err}`);
@@ -233,8 +238,10 @@ const server = http.createServer(async (req, res) => {
             done: manifest.generatedChunks,
             total: manifest.totalChunks,
             errors: 0,
+            chunkStatus: null,
           };
-          res.write(`data: ${JSON.stringify({ ...progress, status: manifest.status })}\n\n`);
+          const cs = progress.chunkStatus ? manifest.chunks.map(c => progress.chunkStatus[c.id] || (c.generated ? 'done' : 'pending')) : manifest.chunks.map(c => c.generated ? 'done' : 'pending');
+          res.write(`data: ${JSON.stringify({ done: progress.done, total: progress.total, errors: progress.errors, status: manifest.status, cs })}\n\n`);
           if (manifest.status === 'ready' || manifest.status === 'error') {
             clearInterval(interval);
             setTimeout(() => res.end(), 500);
