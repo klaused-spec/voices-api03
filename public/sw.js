@@ -1,4 +1,4 @@
-const CACHE_NAME = 'audiobook-studio-v1';
+const CACHE_NAME = 'audiobook-studio-v2';
 const SHELL = ['/', '/manifest.json'];
 
 self.addEventListener('install', (e) => {
@@ -41,17 +41,14 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Shell: stale-while-revalidate
+  // Shell: network-first (always get latest HTML)
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      const fetched = fetch(e.request).then(res => {
-        if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-        }
-        return res;
-      });
-      return cached || fetched;
-    })
+    fetch(e.request).then(res => {
+      if (res.ok) {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      }
+      return res;
+    }).catch(() => caches.match(e.request))
   );
 });
