@@ -53,7 +53,7 @@ async function generateBook(bookId) {
   if (!manifest) return;
 
   books.update(bookId, { status: 'generating' });
-  const concurrency = 1;
+  const concurrency = 3;
   const queue = manifest.chunks.filter(c => !c.generated).map(c => c.id);
   let errors = 0;
   const MAX_RETRIES = 2;
