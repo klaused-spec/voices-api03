@@ -117,6 +117,17 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
   <h1>Audiobook Studio</h1>
 </nav>
 
+<!-- LOGIN PAGE -->
+<div class="page" id="pageLogin">
+  <div style="max-width:340px;margin:80px auto;text-align:center">
+    <div style="font-size:48px;margin-bottom:16px;opacity:.5">&#128272;</div>
+    <h2 style="font-size:18px;margin-bottom:20px">Acesso ao Studio</h2>
+    <input type="password" id="tokenInput" placeholder="Token de acesso" style="width:100%;margin-bottom:12px">
+    <button class="btn-new" style="width:100%" onclick="doLogin()">Entrar</button>
+    <p id="loginError" style="color:var(--red);font-size:13px;margin-top:12px;display:none">Token inválido</p>
+  </div>
+</div>
+
 <!-- LIBRARY PAGE -->
 <div class="page active" id="pageLibrary">
   <div class="lib-header">
@@ -210,7 +221,25 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 
 <script>
 const API = '';
-const AUTH = '';
+const AUTH = localStorage.getItem('ab_token') || '';
+
+async function doLogin() {
+  const token = document.getElementById('tokenInput').value.trim();
+  if (!token) return;
+  try {
+    const r = await fetch(API + '/api/books', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (r.ok) {
+      localStorage.setItem('ab_token', token);
+      location.reload();
+    } else {
+      document.getElementById('loginError').style.display = '';
+    }
+  } catch {
+    document.getElementById('loginError').style.display = '';
+  }
+}
+
+document.getElementById('tokenInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 const audioEl = document.getElementById('audioEl');
 
 // ─── STATE ────────────────────────────────────────
@@ -650,6 +679,12 @@ function fmtTime(s) {
 (async function init() {
   const savedSpeed = parseFloat(localStorage.getItem('ab_speed'));
   if (savedSpeed && SPEEDS.includes(savedSpeed)) playbackRate = savedSpeed;
+
+  if (!AUTH) {
+    showPage('Login');
+    document.getElementById('tokenInput').focus();
+    return;
+  }
 
   await loadVoices();
 
