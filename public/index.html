@@ -76,6 +76,23 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .chunk-item .badge{font-size:10px;background:var(--orange);color:#000;padding:2px 6px;border-radius:4px;white-space:nowrap;font-weight:600}
 .chunk-item .toggle{background:none;border:none;font-size:16px;padding:2px;cursor:pointer;color:var(--green)}
 .chunk-item.excluded .toggle{color:var(--red)}
+
+/* CHAPTERS */
+.chapter-group{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px}
+.chapter-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);cursor:pointer;user-select:none;transition:background .15s}
+.chapter-hdr:hover{background:var(--surface2)}
+.chapter-hdr .arrow{font-size:12px;color:var(--text2);transition:transform .2s;min-width:14px}
+.chapter-hdr.open .arrow{transform:rotate(90deg)}
+.chapter-hdr .ch-name{font-size:14px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chapter-hdr .ch-count{font-size:11px;color:var(--text2);white-space:nowrap}
+.chapter-hdr .ch-btns{display:flex;gap:4px}
+.chapter-hdr .ch-btns button{font-size:11px;padding:3px 8px;border-radius:4px;background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+.chapter-hdr .ch-btns button:hover{background:var(--border);color:var(--text)}
+.chapter-hdr.auto-excluded{opacity:.5}
+.chapter-hdr.auto-excluded .ch-name{text-decoration:line-through}
+.chapter-body{display:none;padding:6px}
+.chapter-group.open .chapter-body{display:flex;flex-direction:column;gap:4px}
+
 .gen-bar{margin-top:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .btn-gen{background:var(--accent);color:#fff;padding:12px 28px;font-weight:700;font-size:15px}
 .btn-gen:hover{background:var(--accent2)}
@@ -173,7 +190,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
       <span class="count" id="chunksCount"></span>
       <button class="btn-sm" onclick="toggleAll(true)">Incluir todos</button>
       <button class="btn-sm" onclick="toggleAll(false)">Excluir todos</button>
-      <button class="btn-sm warn" onclick="autoDetect()">Auto-detectar lixo</button>
     </div>
     <div class="chunk-list" id="chunkList"></div>
 
@@ -370,7 +386,7 @@ async function loadBookForEdit(id) {
     document.getElementById('modelSelect').value = book.model;
     chunks = book.chunks.map(c => ({ text: c.text, excluded: false, suspect: false }));
     document.getElementById('dropZone').style.display = 'none';
-    renderChunks();
+    autoDetect();
   } catch (e) { console.error(e); goLibrary(); }
 }
 
@@ -398,7 +414,6 @@ async function handleFile(file) {
     }
     document.getElementById('dropLabel').textContent = `${file.name} — ${data.pages} páginas, ${data.totalParagraphs} parágrafos`;
     autoDetect();
-    renderChunks();
   } catch (e) {
     document.getElementById('dropLabel').textContent = 'Erro: ' + e.message;
   }
@@ -410,14 +425,62 @@ function renderChunks() {
   document.getElementById('chunksCount').textContent = `${included} incluídos de ${chunks.length} total`;
 
   const list = document.getElementById('chunkList');
-  list.innerHTML = chunks.map((c, i) => `
-    <div class="chunk-item ${c.excluded ? 'excluded' : ''} ${c.suspect ? 'suspect' : ''}" data-idx="${i}">
-      <span class="idx">${i + 1}</span>
-      <button class="toggle" onclick="toggleChunk(${i})">${c.excluded ? '&#10060;' : '&#9989;'}</button>
-      <div class="txt" contenteditable="true" onblur="updateText(${i}, this.textContent)">${esc(c.text)}</div>
-      ${c.suspect ? '<span class="badge">Sugestão</span>' : ''}
-    </div>
-  `).join('');
+
+  if (chapters.length === 0) {
+    list.innerHTML = chunks.map((c, i) => renderChunkItem(c, i)).join('');
+    return;
+  }
+
+  list.innerHTML = chapters.map((ch, ci) => {
+    const chunkSlice = chunks.slice(ch.startIdx, ch.endIdx + 1);
+    const chIncluded = chunkSlice.filter(c => !c.excluded).length;
+    const chTotal = chunkSlice.length;
+    const isOpen = !ch.autoExcluded && (ch._open !== false);
+    const openClass = isOpen ? 'open' : '';
+    const autoClass = ch.autoExcluded ? 'auto-excluded' : '';
+
+    const items = chunkSlice.map((c, j) => renderChunkItem(c, ch.startIdx + j)).join('');
+
+    return `<div class="chapter-group ${openClass}" data-ch="${ci}">
+      <div class="chapter-hdr ${openClass} ${autoClass}" onclick="toggleChapter(${ci})">
+        <span class="arrow">&#9654;</span>
+        <span class="ch-name">${esc(ch.name)}</span>
+        <span class="ch-count">${chIncluded}/${chTotal}</span>
+        <div class="ch-btns">
+          <button onclick="event.stopPropagation(); chapterToggleAll(${ci}, true)">Incluir</button>
+          <button onclick="event.stopPropagation(); chapterToggleAll(${ci}, false)">Excluir</button>
+        </div>
+      </div>
+      <div class="chapter-body">${items}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderChunkItem(c, i) {
+  return `<div class="chunk-item ${c.excluded ? 'excluded' : ''} ${c.suspect ? 'suspect' : ''}" data-idx="${i}">
+    <span class="idx">${i + 1}</span>
+    <button class="toggle" onclick="toggleChunk(${i})">${c.excluded ? '&#10060;' : '&#9989;'}</button>
+    <div class="txt" contenteditable="true" onblur="updateText(${i}, this.textContent)">${esc(c.text)}</div>
+    ${c.suspect ? '<span class="badge">Auto</span>' : ''}
+  </div>`;
+}
+
+function toggleChapter(ci) {
+  const ch = chapters[ci];
+  const group = document.querySelector(`.chapter-group[data-ch="${ci}"]`);
+  if (!group) return;
+  const isOpen = group.classList.toggle('open');
+  group.querySelector('.chapter-hdr').classList.toggle('open', isOpen);
+  ch._open = isOpen;
+}
+
+function chapterToggleAll(ci, include) {
+  const ch = chapters[ci];
+  for (let i = ch.startIdx; i <= ch.endIdx; i++) {
+    chunks[i].excluded = !include;
+  }
+  ch.autoExcluded = !include;
+  renderChunks();
 }
 
 function toggleChunk(idx) {
@@ -427,6 +490,7 @@ function toggleChunk(idx) {
 
 function toggleAll(include) {
   chunks.forEach(c => c.excluded = !include);
+  chapters.forEach(ch => ch.autoExcluded = !include);
   renderChunks();
 }
 
@@ -435,29 +499,80 @@ function updateText(idx, text) {
 }
 
 function autoDetect() {
-  const patterns = [
-    /^(cap[ií]tulo|chapter|introdu[çc][aã]o|introduction|pref[aá]cio|preface|sum[aá]rio|contents|agradecimentos|acknowledgements|refer[eê]ncias|references|bibliografia|bibliography|ap[eê]ndice|appendix|[ií]ndice|index)\b/i,
-    /^\d+$/, // bare page numbers
-    /^[-–—_=]{3,}$/, // dividers
+  const junkPatterns = [
+    /^\d+$/,
+    /^[-–—_=]{3,}$/,
     /^(fig(ura)?|table|tabela|quadro|gr[aá]fico)\s*\d/i,
-    /^[A-ZÁÉÍÓÚÀÂÊÔÃÕÇÜ\s]{5,}$/, // all-caps (likely headers)
+    /compre agora e leia/i,
+    /^\d{10,13}$/,
+    /\d+\s*p[aá]ginas\s+compre/i,
+    /^https?:\/\//i,
+    /^(t\.me|facebook|instagram|twitter)\b/i,
   ];
 
+  let afterCopyright = false;
   chunks.forEach(c => {
     c.suspect = false;
     const t = c.text.trim();
-    if (t.split(/\s+/).length <= 3) { c.suspect = true; return; }
-    for (const p of patterns) {
-      if (p.test(t)) { c.suspect = true; return; }
+    if (afterCopyright) { c.suspect = true; c.excluded = true; return; }
+    if (/^Copyright\s*©/i.test(t)) { afterCopyright = true; c.suspect = true; c.excluded = true; return; }
+    if (t.split(/\s+/).length <= 2) { c.suspect = true; return; }
+    for (const p of junkPatterns) {
+      if (p.test(t)) { c.suspect = true; c.excluded = true; return; }
     }
   });
+
+  detectChapters();
   renderChunks();
 }
 
-function excludeSuspects() {
-  chunks.forEach(c => { if (c.suspect) c.excluded = true; });
-  renderChunks();
+function isChapterHeader(text) {
+  const t = text.trim();
+  const words = t.split(/\s+/);
+  if (words.length > 10) return false;
+  if (/^(parte|cap[ií]tulo|chapter|part)\s+/i.test(t)) return true;
+  if (/^[A-ZÁÉÍÓÚÀÂÊÔÃÕÇÜ\s\d,.:–—-]{5,}$/.test(t) && words.length <= 8) return true;
+  if (/^(janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+\d/i.test(t)) return true;
+  return false;
 }
+
+let chapters = [];
+
+function detectChapters() {
+  chapters = [];
+  let current = { name: 'Pré-texto', startIdx: 0, autoExcluded: true };
+
+  chunks.forEach((c, i) => {
+    if (isChapterHeader(c.text)) {
+      if (current) {
+        current.endIdx = i - 1;
+        if (current.endIdx >= current.startIdx) chapters.push(current);
+      }
+      current = { name: c.text.trim(), startIdx: i, autoExcluded: false };
+      c.excluded = true;
+      c.isHeader = true;
+    }
+  });
+
+  if (current) {
+    current.endIdx = chunks.length - 1;
+    if (current.endIdx >= current.startIdx) chapters.push(current);
+  }
+
+  if (chapters.length > 0 && chapters[0].name === 'Pré-texto') {
+    for (let i = chapters[0].startIdx; i <= chapters[0].endIdx; i++) {
+      chunks[i].excluded = true;
+    }
+  }
+
+  // Detect trailing junk (after copyright/catalog)
+  for (let ci = chapters.length - 1; ci >= 0; ci--) {
+    const ch = chapters[ci];
+    const allExcluded = chunks.slice(ch.startIdx, ch.endIdx + 1).every(c => c.excluded);
+    if (allExcluded) { ch.autoExcluded = true; } else break;
+  }
+}
+
 
 async function handleGenerate() {
   const title = document.getElementById('bookTitle').value.trim();
